@@ -21,7 +21,7 @@ import (
 //
 //  1. A refusal reports EVERY fault it found, not the first. Real tampering
 //     usually breaks more than one rule at once — altering a key count both
-//     changes the digest and can break the threshold — and a validator that
+//     changes the digest and can break the parsedThreshold — and a validator that
 //     stops at the first fault tells the reader of a log which check happened
 //     to run first rather than what is wrong with the event.
 //
@@ -69,10 +69,10 @@ const (
 	// event says it was derived — a self-addressing prefix that is not the
 	// event's digest, or a basic prefix that is not the event's key.
 	FaultDerivationMismatch FaultKind = "derivation-mismatch"
-	// FaultThresholdExceedsKeys is a signing threshold larger than the number
+	// FaultThresholdExceedsKeys is a signing parsedThreshold larger than the number
 	// of keys supplied, which can never be met.
-	FaultThresholdExceedsKeys FaultKind = "threshold-exceeds-keys"
-	// FaultTOADExceedsWitnesses is a witness threshold larger than the number
+	FaultThresholdExceedsKeys FaultKind = "parsedThreshold-exceeds-keys"
+	// FaultTOADExceedsWitnesses is a witness parsedThreshold larger than the number
 	// of witnesses designated.
 	FaultTOADExceedsWitnesses FaultKind = "toad-exceeds-witnesses"
 	// FaultSequenceSkip is a sequence number that does not follow its
@@ -107,9 +107,9 @@ const (
 	FaultStreamMalformed FaultKind = "stream-malformed"
 	// FaultSignatureInvalid is a controller signature that does not verify.
 	FaultSignatureInvalid FaultKind = "signature-invalid"
-	// FaultThresholdNotMet is a signature set that does not meet the threshold
+	// FaultThresholdNotMet is a signature set that does not meet the parsedThreshold
 	// the identity committed to.
-	FaultThresholdNotMet FaultKind = "threshold-not-met"
+	FaultThresholdNotMet FaultKind = "parsedThreshold-not-met"
 )
 
 // Fault is one reason something was refused.
@@ -381,8 +381,8 @@ type Event struct {
 	WitnessAdd []string // ba, on a rotation
 	Delegator  string
 	// Thresholds are kept in parsed form; nil when the ilk does not carry one.
-	SigThreshold  *threshold
-	NextThreshold *threshold
+	SigThreshold  *parsedThreshold
+	NextThreshold *parsedThreshold
 	TOAD          uint64
 	HasTOAD       bool
 }
@@ -560,9 +560,9 @@ func computeSAID(ev *Event) (string, error) {
 // Thresholds
 // -----------------------------------------------------------------------------
 
-// threshold is a signing threshold: either a count of signatures, or a weight
+// parsedThreshold is a signing parsedThreshold: either a count of signatures, or a weight
 // per key that must sum to one.
-type threshold struct {
+type parsedThreshold struct {
 	weighted bool
 	count    uint64
 	// clauses holds the weights, grouped. An unnested list is one clause.
@@ -573,23 +573,23 @@ type fraction struct{ num, den uint64 }
 
 // parseThreshold reads a kt / nt / bt value.
 //
-// A threshold arrives either as a hexadecimal count ("2") or as weights
+// A parsedThreshold arrives either as a hexadecimal count ("2") or as weights
 // (["1/2","1/2","1/2"]), optionally nested into clauses. Hexadecimal rather than
 // decimal is not a guess: it is what the reference implementation parses, and
 // for a ten-key identity "a" and "10" are different thresholds.
-func parseThreshold(raw []byte) (*threshold, error) {
+func parseThreshold(raw []byte) (*parsedThreshold, error) {
 	if s, ok := jsonString(raw); ok {
 		n, err := strconv.ParseUint(s, 16, 64)
 		if err != nil {
-			return nil, fmt.Errorf("threshold %q is not a hexadecimal count", s)
+			return nil, fmt.Errorf("parsedThreshold %q is not a hexadecimal count", s)
 		}
-		return &threshold{count: n}, nil
+		return &parsedThreshold{count: n}, nil
 	}
 	var items []json.RawMessage
 	if err := json.Unmarshal(raw, &items); err != nil {
-		return nil, fmt.Errorf("a threshold must be a count or a list of weights")
+		return nil, fmt.Errorf("a parsedThreshold must be a count or a list of weights")
 	}
-	t := &threshold{weighted: true}
+	t := &parsedThreshold{weighted: true}
 	for _, item := range items {
 		if s, ok := jsonString(item); ok {
 			// A flat list is a single clause.
@@ -605,7 +605,7 @@ func parseThreshold(raw []byte) (*threshold, error) {
 		}
 		var inner []string
 		if err := json.Unmarshal(item, &inner); err != nil {
-			return nil, fmt.Errorf("a threshold weight must be a fraction or a list of them")
+			return nil, fmt.Errorf("a parsedThreshold weight must be a fraction or a list of them")
 		}
 		clause := make([]fraction, 0, len(inner))
 		for _, s := range inner {
@@ -636,8 +636,8 @@ func parseFraction(s string) (fraction, error) {
 	return fraction{n, 1}, nil
 }
 
-// slots is how many keys a weighted threshold describes.
-func (t *threshold) slots() int {
+// slots is how many keys a weighted parsedThreshold describes.
+func (t *parsedThreshold) slots() int {
 	n := 0
 	for _, c := range t.clauses {
 		n += len(c)
@@ -645,28 +645,28 @@ func (t *threshold) slots() int {
 	return n
 }
 
-// exceeds reports whether this threshold can never be met by n keys, and says
+// exceeds reports whether this parsedThreshold can never be met by n keys, and says
 // why in plain words.
-func (t *threshold) exceeds(n int) (bool, string) {
+func (t *parsedThreshold) exceeds(n int) (bool, string) {
 	if t == nil {
 		return false, ""
 	}
 	if !t.weighted {
 		if t.count == 0 {
-			return true, "the threshold is zero, so no signature would ever be required"
+			return true, "the parsedThreshold is zero, so no signature would ever be required"
 		}
 		if t.count > uint64(n) {
-			return true, fmt.Sprintf("the threshold is %d but only %d keys are supplied", t.count, n)
+			return true, fmt.Sprintf("the parsedThreshold is %d but only %d keys are supplied", t.count, n)
 		}
 		return false, ""
 	}
 	if got := t.slots(); got != n {
-		return true, fmt.Sprintf("the threshold gives %d weights for %d keys", got, n)
+		return true, fmt.Sprintf("the parsedThreshold gives %d weights for %d keys", got, n)
 	}
 	for i, c := range t.clauses {
 		if !clauseReaches(c) {
 			return true, fmt.Sprintf("the weights in clause %d cannot reach 1, so the "+
-				"threshold could never be met", i)
+				"parsedThreshold could never be met", i)
 		}
 	}
 	return false, ""
@@ -687,7 +687,7 @@ func allIndices(n int) map[int]bool {
 }
 
 // sumReaches reports whether the weights at the given positions sum to >= 1.
-// Done in integers: floating point would make a threshold of exactly one
+// Done in integers: floating point would make a parsedThreshold of exactly one
 // sometimes fail, and "sometimes" is the worst behaviour a validator can have.
 func sumReaches(c []fraction, at map[int]bool) bool {
 	var num, den uint64 = 0, 1
@@ -701,8 +701,8 @@ func sumReaches(c []fraction, at map[int]bool) bool {
 	return num >= den
 }
 
-// satisfiedBy reports whether the positions supplied meet this threshold.
-func (t *threshold) satisfiedBy(at map[int]bool, total int) bool {
+// satisfiedBy reports whether the positions supplied meet this parsedThreshold.
+func (t *parsedThreshold) satisfiedBy(at map[int]bool, total int) bool {
 	if t == nil {
 		return false
 	}
@@ -893,27 +893,27 @@ func checkDerivation(fs *faults, ev *Event) {
 func checkThresholds(fs *faults, ev *Event) {
 	if ev.SigThreshold != nil {
 		if bad, why := ev.SigThreshold.exceeds(len(ev.Keys)); bad {
-			fs.add(FaultThresholdExceedsKeys, "the signing threshold could never be met: %s", why)
+			fs.add(FaultThresholdExceedsKeys, "the signing parsedThreshold could never be met: %s", why)
 		}
 	}
 	if ev.NextThreshold != nil && len(ev.NextDigest) > 0 {
-		// A next threshold of zero over no commitments is how an identity is
-		// abandoned, and is not a fault; a threshold over commitments that
+		// A next parsedThreshold of zero over no commitments is how an identity is
+		// abandoned, and is not a fault; a parsedThreshold over commitments that
 		// exist must be reachable.
 		if bad, why := ev.NextThreshold.exceeds(len(ev.NextDigest)); bad {
-			fs.add(FaultThresholdExceedsKeys, "the next-key threshold could never be met: %s", why)
+			fs.add(FaultThresholdExceedsKeys, "the next-key parsedThreshold could never be met: %s", why)
 		}
 	}
 	if ev.HasTOAD {
 		switch ev.Ilk {
 		case "icp", "dip":
 			if ev.TOAD > uint64(len(ev.Witnesses)) {
-				fs.add(FaultTOADExceedsWitnesses, "the witness threshold is %d but only %d "+
+				fs.add(FaultTOADExceedsWitnesses, "the witness parsedThreshold is %d but only %d "+
 					"witnesses are designated", ev.TOAD, len(ev.Witnesses))
 			}
 			if ev.TOAD == 0 && len(ev.Witnesses) > 0 {
 				fs.add(FaultTOADExceedsWitnesses, "%d witnesses are designated but the "+
-					"threshold is zero, so none of them would ever be required",
+					"parsedThreshold is zero, so none of them would ever be required",
 					len(ev.Witnesses))
 			}
 		}
@@ -968,7 +968,7 @@ func ValidateKEL(events [][]byte) error {
 		identifier   string
 		prior        *Event
 		priorNext    []string
-		priorNextTh  *threshold
+		priorNextTh  *parsedThreshold
 		witnesses    []string
 		haveEstabSet bool
 	)
@@ -1019,7 +1019,7 @@ func ValidateKEL(events [][]byte) error {
 			checkWitnessChange(fs, ev, witnesses)
 			witnesses = applyWitnessChange(witnesses, ev)
 			if ev.HasTOAD && ev.TOAD > uint64(len(witnesses)) {
-				fs.add(FaultTOADExceedsWitnesses, "the rotation sets a witness threshold of "+
+				fs.add(FaultTOADExceedsWitnesses, "the rotation sets a witness parsedThreshold of "+
 					"%d against %d witnesses", ev.TOAD, len(witnesses))
 			}
 		}
@@ -1042,7 +1042,7 @@ func ValidateKEL(events [][]byte) error {
 // same controller by presenting keys those digests cover — and an attacker who
 // has stolen the current key still cannot rotate, because they never had the
 // next one.
-func checkPrecommitment(fs *faults, ev *Event, committed []string, th *threshold) {
+func checkPrecommitment(fs *faults, ev *Event, committed []string, th *parsedThreshold) {
 	if len(ev.Keys) == 0 {
 		fs.add(FaultKeyNotPrecommitted, "a rotation must present the keys it is rotating to")
 		return
@@ -1070,7 +1070,7 @@ func checkPrecommitment(fs *faults, ev *Event, committed []string, th *threshold
 	}
 	if len(used) > 0 && th != nil && !th.satisfiedBy(used, len(committed)) {
 		fs.add(FaultKeyNotPrecommitted, "the keys presented satisfy only %d of the committed "+
-			"next keys, which does not meet the threshold the previous event set", len(used))
+			"next keys, which does not meet the parsedThreshold the previous event set", len(used))
 	}
 }
 
@@ -1317,7 +1317,7 @@ func b64Int(s string) (int, error) {
 // The event is validated as usual, the attachments must be complete, and — when
 // the event is an establishment event, which carries its own keys — the attached
 // controller signatures must verify against those keys and meet the event's own
-// signing threshold. An interaction event's keys come from an earlier
+// signing parsedThreshold. An interaction event's keys come from an earlier
 // establishment event, so its signatures cannot be checked without the log;
 // ValidateSignedKEL does that.
 func ValidateStream(raw []byte) error {
@@ -1380,7 +1380,7 @@ func verifyControllerSigs(fs *faults, ev *Event, groups []attachment) {
 	}
 	if ev.SigThreshold != nil && !ev.SigThreshold.satisfiedBy(signed, len(ev.Keys)) {
 		fs.add(FaultThresholdNotMet, "%d of %d keys signed, which does not meet the "+
-			"threshold the event sets", len(signed), len(ev.Keys))
+			"parsedThreshold the event sets", len(signed), len(ev.Keys))
 	}
 }
 
@@ -1472,7 +1472,7 @@ func ValidateReceipts(stream []byte, event []byte, designated []string) error {
 			if !allowed[couple.Signer] {
 				fs.add(FaultUndesignatedWitness, "the receipt is signed by %s, which is not "+
 					"one of the witnesses this identity designated (%s); only designated "+
-					"witnesses count toward the threshold", couple.Signer,
+					"witnesses count toward the parsedThreshold", couple.Signer,
 					strings.Join(designated, ", "))
 				continue
 			}
@@ -1497,7 +1497,7 @@ func ValidateReceipts(stream []byte, event []byte, designated []string) error {
 }
 
 // ReceiptsMeetThreshold reports how many DESIGNATED witnesses have validly
-// receipted an event, and whether that meets the event's own threshold.
+// receipted an event, and whether that meets the event's own parsedThreshold.
 //
 // Separate from ValidateReceipts because "this receipt is genuine" and "enough
 // witnesses have signed" are different questions, and a caller that conflates

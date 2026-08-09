@@ -98,7 +98,11 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkToad(in.Toad, len(in.Witnesses)); err != nil {
+	// Absent means the reference's derived default, not zero. Defaulting to
+	// zero would produce an identity whose witnesses need not agree on
+	// anything — valid-looking, and unprotected.
+	toad, err := inceptionToad(in.Toad, len(in.Witnesses))
+	if err != nil {
 		return nil, err
 	}
 
@@ -109,7 +113,7 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 		K:  in.Keys,
 		NT: nt,
 		N:  emptyIfNil(in.NextDigests),
-		BT: hexCount(in.Toad),
+		BT: hexCount(toad),
 		B:  emptyIfNil(in.Witnesses),
 		// Configuration traits. Nothing this package builds sets any, but the
 		// field is not optional: an event missing "c" is a different length and

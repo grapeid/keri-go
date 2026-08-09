@@ -153,7 +153,7 @@ func TestRotationMatchesTheReferenceBeyondTheVectors(t *testing.T) {
 func TestTheDerivedWitnessThresholdMatchesTheReference(t *testing.T) {
 	want := []int{0, 1, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 8}
 	for n, w := range want {
-		if got := rotAmple(n); got != w {
+		if got := ample(n); got != w {
 			t.Errorf("for %d witnesses the threshold should be %d, got %d", n, w, got)
 		}
 	}

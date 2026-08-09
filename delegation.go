@@ -311,7 +311,7 @@ func BuildDelegatedRotation(in DelegationInput) ([]byte, error) {
 	// Rendered by the rotation helper rather than re-derived. Same reasoning as
 	// the inception half above: one implementation of the hexadecimal and
 	// weight rules, not a third copy of it.
-	kt, err := rotParseThreshold(in.Isith, max(1, rotCeilDiv(len(keys), 2)))
+	kt, err := parseThresholdValue(in.Isith, max(1, ceilDiv(len(keys), 2)))
 	if err != nil {
 		return nil, fmt.Errorf("current signing threshold: %w", err)
 	}
@@ -319,7 +319,7 @@ func BuildDelegatedRotation(in DelegationInput) ([]byte, error) {
 		return nil, fmt.Errorf("the signing threshold needs %d keys but the "+
 			"rotation presents %d", kt.size, len(keys))
 	}
-	nt, err := rotParseThreshold(in.Nsith, max(0, rotCeilDiv(len(nexts), 2)))
+	nt, err := parseThresholdValue(in.Nsith, max(0, ceilDiv(len(nexts), 2)))
 	if err != nil {
 		return nil, fmt.Errorf("next signing threshold: %w", err)
 	}
@@ -378,14 +378,14 @@ func BuildDelegatedRotation(in DelegationInput) ([]byte, error) {
 // identity on which no witness need ever agree — the protection silently
 // switched off, which is worse than an error.
 //
-// rotAmple is that derivation, already written for rotations and reused rather
+// ample is that derivation, already written for rotations and reused rather
 // than copied; it is keripy's ample() and matches it for every set size.
 func inceptionToad(toad *int, witnesses int) (int, error) {
 	n := 0
 	if toad != nil {
 		n = *toad
 	} else if witnesses > 0 {
-		n = rotAmple(witnesses)
+		n = ample(witnesses)
 	}
 	if err := checkToad(n, witnesses); err != nil {
 		return 0, err

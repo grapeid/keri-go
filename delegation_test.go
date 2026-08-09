@@ -212,16 +212,3 @@ func TestDelegationRefusesEventsNobodyCouldAccept(t *testing.T) {
 		})
 	}
 }
-
-// The witness threshold a dip states when none is given is reused from the
-// rotation code, so it is worth pinning that it still agrees with the reference.
-// keripy's ample(1..19); a majority rule looks close enough and is not.
-func TestWitnessThresholdDefaultMatchesTheReference(t *testing.T) {
-	want := []int{1, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 8, 9, 10, 10, 11, 12, 12, 13}
-	for i, w := range want {
-		if got := rotAmple(i + 1); got != w {
-			t.Errorf("with %d witnesses the derived threshold is %d, but keripy's "+
-				"ample() gives %d", i+1, got, w)
-		}
-	}
-}

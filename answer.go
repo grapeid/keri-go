@@ -65,7 +65,13 @@ type InceptionInput struct {
 	Keys        []string `json:"keys"`
 	NextDigests []string `json:"next_digests"`
 	Witnesses   []string `json:"witnesses"`
-	Toad        int      `json:"toad"`
+	// Toad is a POINTER so that "absent" and "zero" stay different instructions.
+	//
+	// Absent means take the reference's default, which is derived from the
+	// witness count; zero means no witness need agree. An int cannot tell those
+	// apart, and the version that could not rejected any witnessed inception
+	// that did not state one — where the reference would have filled it in.
+	Toad *int `json:"toad"`
 	// Thresholds are either a string ("2") or a list of weight strings
 	// (["1/2","1/2","1/2"]). Kept as raw JSON so both forms the reference
 	// produces can round-trip without the harness inventing a type.

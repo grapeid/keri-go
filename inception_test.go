@@ -164,7 +164,7 @@ func inceptionInputFrom(t *testing.T, ev icpEventFields) InceptionInput {
 		Keys:        ev.K,
 		NextDigests: ev.N,
 		Witnesses:   ev.B,
-		Toad:        int(toad),
+		Toad:        intPtr(int(toad)),
 		Isith:       ev.KT,
 		Nsith:       ev.NT,
 		Data:        ev.A,
@@ -313,14 +313,14 @@ func TestWitnessThresholdIsChecked(t *testing.T) {
 		in   InceptionInput
 	}{
 		{"a toad no witness set could meet",
-			InceptionInput{Keys: base.Keys, NextDigests: base.NextDigests, Witnesses: wits, Toad: 3}},
+			InceptionInput{Keys: base.Keys, NextDigests: base.NextDigests, Witnesses: wits, Toad: intPtr(3)}},
 		{"witnesses named but none required",
-			InceptionInput{Keys: base.Keys, NextDigests: base.NextDigests, Witnesses: wits, Toad: 0}},
+			InceptionInput{Keys: base.Keys, NextDigests: base.NextDigests, Witnesses: wits, Toad: intPtr(0)}},
 		{"a toad with nothing to receipt it",
-			InceptionInput{Keys: base.Keys, NextDigests: base.NextDigests, Toad: 1}},
+			InceptionInput{Keys: base.Keys, NextDigests: base.NextDigests, Toad: intPtr(1)}},
 		{"the same witness twice",
 			InceptionInput{Keys: base.Keys, NextDigests: base.NextDigests,
-				Witnesses: []string{wits[0], wits[0]}, Toad: 1}},
+				Witnesses: []string{wits[0], wits[0]}, Toad: intPtr(1)}},
 		{"the same key twice",
 			InceptionInput{Keys: []string{base.Keys[0], base.Keys[0]},
 				NextDigests: base.NextDigests}},
@@ -335,3 +335,7 @@ func TestWitnessThresholdIsChecked(t *testing.T) {
 		})
 	}
 }
+
+// intPtr is for tests that round-trip an event: the toad read back out of one is
+// always stated, so it is never the absent case.
+func intPtr(n int) *int { return &n }
