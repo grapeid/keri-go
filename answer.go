@@ -44,12 +44,13 @@ func Answer(c Case) ([]byte, error) {
 		return BuildDelegation(in)
 	case "credential":
 		return AnswerCredential(c)
-	case "receipt", "stream":
-		// Witness receipts and CESR streams — not filled in yet.
-		return nil, ErrNotImplemented
+	case "receipt":
+		return AnswerReceipt(c)
+	case "stream":
+		return AnswerStream(c)
 	case "constants", "property", "reject":
 		// Asserted directly by their own tests rather than by producing bytes.
-		return nil, ErrNotImplemented
+		return nil, errAnsweredByAssert
 	default:
 		return nil, fmt.Errorf("no answer defined for a %q case", c.Kind)
 	}

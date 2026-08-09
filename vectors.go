@@ -54,6 +54,40 @@ type Case struct {
 	Assert string          `json:"assert"`
 	Input  json.RawMessage `json:"input"`
 	Expect Expectation     `json:"expect"`
+	// ExpectRaw is the expect object as raw JSON. Structured Expectation only
+	// models the fields every case shares; attachment material (couples,
+	// cigars, constants tables) lives in the rest of the object and is read
+	// from here by the builders that need it.
+	ExpectRaw json.RawMessage `json:"-"`
+}
+
+// UnmarshalJSON keeps the expect object twice: once as the structured
+// Expectation the harness compares against, and once as raw JSON so builders
+// can read attachment material the struct does not model.
+func (c *Case) UnmarshalJSON(data []byte) error {
+	var probe struct {
+		ID     string          `json:"id"`
+		Kind   string          `json:"kind"`
+		Why    string          `json:"why"`
+		Assert string          `json:"assert"`
+		Input  json.RawMessage `json:"input"`
+		Expect json.RawMessage `json:"expect"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return err
+	}
+	c.ID = probe.ID
+	c.Kind = probe.Kind
+	c.Why = probe.Why
+	c.Assert = probe.Assert
+	c.Input = probe.Input
+	c.ExpectRaw = probe.Expect
+	if len(probe.Expect) > 0 {
+		if err := json.Unmarshal(probe.Expect, &c.Expect); err != nil {
+			return fmt.Errorf("case %s: expect is not readable: %w", probe.ID, err)
+		}
+	}
+	return nil
 }
 
 // Expectation is what a conformant implementation must produce.

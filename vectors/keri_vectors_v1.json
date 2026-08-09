@@ -2129,6 +2129,7 @@
         "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
         "prefix": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
         "witness": "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+        "cigar_qb64": "0BDQdifkdV9fJMrb4Dw2Kw_kTS9GMSFF3oJ4DXIhA5IKIvOdJD2guLWRT6fjK8CoPLb2cZJIXXCw6LWG69IM1_QJ",
         "toad": 2,
         "witnesses": [
           "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
@@ -2160,6 +2161,20 @@
           "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
           "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
           "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ],
+        "couples": [
+          {
+            "witness": "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+            "cigar_qb64": "0BDQdifkdV9fJMrb4Dw2Kw_kTS9GMSFF3oJ4DXIhA5IKIvOdJD2guLWRT6fjK8CoPLb2cZJIXXCw6LWG69IM1_QJ"
+          },
+          {
+            "witness": "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+            "cigar_qb64": "0BDma-0UlLw0wll6pLUCNB1JH1XGw5Ag3J0ChNMdkSr-Y988H97Nhwk06YMbUj-71BtMVM0c_oKL9J3Lad0fHDwD"
+          },
+          {
+            "witness": "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV",
+            "cigar_qb64": "0BCJ5TrEZjHgvZXRFncvrkXUonVJhxs611kFsAgxSd6IFWK_x97vj5F0XsefmhPZ7gjXJxLOsnj24sjxdfV1pwMK"
+          }
         ],
         "toad": 2
       },
@@ -2203,6 +2218,16 @@
         "signing_witnesses": [
           "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
           "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c"
+        ],
+        "couples": [
+          {
+            "witness": "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+            "cigar_qb64": "0BDQdifkdV9fJMrb4Dw2Kw_kTS9GMSFF3oJ4DXIhA5IKIvOdJD2guLWRT6fjK8CoPLb2cZJIXXCw6LWG69IM1_QJ"
+          },
+          {
+            "witness": "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+            "cigar_qb64": "0BDma-0UlLw0wll6pLUCNB1JH1XGw5Ag3J0ChNMdkSr-Y988H97Nhwk06YMbUj-71BtMVM0c_oKL9J3Lad0fHDwD"
+          }
         ]
       },
       "expect": {
@@ -2227,6 +2252,12 @@
         "toad": 2,
         "signing_witnesses": [
           "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn"
+        ],
+        "couples": [
+          {
+            "witness": "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+            "cigar_qb64": "0BDQdifkdV9fJMrb4Dw2Kw_kTS9GMSFF3oJ4DXIhA5IKIvOdJD2guLWRT6fjK8CoPLb2cZJIXXCw6LWG69IM1_QJ"
+          }
         ]
       },
       "expect": {
