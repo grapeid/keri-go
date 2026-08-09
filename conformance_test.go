@@ -77,23 +77,76 @@ func TestTheVectorsAreInternallyConsistent(t *testing.T) {
 			t.Errorf("%s: %v", c.ID, err)
 			continue
 		}
+		// CESR streams are an event JSON blob followed by attachment counters
+		// (e.g. `-AAB…`). The whole stream is not one JSON value; check the
+		// leading event only.
+		event := raw
+		if i := indexEventEnd(raw); i >= 0 && i+1 < len(raw) && raw[i+1] == '-' {
+			event = raw[:i+1]
+		}
 		var ev map[string]interface{}
-		if err := json.Unmarshal(raw, &ev); err != nil {
+		if err := json.Unmarshal(event, &ev); err != nil {
 			t.Errorf("%s: the expected bytes are not a readable event: %v", c.ID, err)
 			continue
 		}
-		if d, _ := ev["d"].(string); d != c.Expect.SAID {
-			t.Errorf("%s: the event's own identifier is %q but the case expects %q",
-				c.ID, d, c.Expect.SAID)
+		// Schema documents use $id as their SAID, not d, and are not KERI events.
+		if id, ok := ev["$id"].(string); ok && c.Expect.SAID != "" {
+			if id != c.Expect.SAID {
+				t.Errorf("%s: the schema's own identifier is %q but the case expects %q",
+					c.ID, id, c.Expect.SAID)
+			}
+			continue
 		}
-		// A KERI event is ordered: the version string comes first and states the
-		// length of what follows. This is the property our stored events did not
-		// have, and it went unnoticed for months.
-		if len(raw) > 6 && string(raw[:6]) != `{"v":"` {
+		if c.Expect.SAID != "" {
+			if d, _ := ev["d"].(string); d != c.Expect.SAID {
+				t.Errorf("%s: the event's own identifier is %q but the case expects %q",
+					c.ID, d, c.Expect.SAID)
+			}
+		}
+		// A KERI/ACDC event is ordered: the version string comes first and states
+		// the length of what follows. This is the property our stored events did
+		// not have, and it went unnoticed for months.
+		if len(event) > 6 && string(event[:6]) != `{"v":"` {
 			t.Errorf("%s: the expected bytes do not begin with the version string, so "+
 				"they are not canonical KERI serialisation", c.ID)
 		}
 	}
+}
+
+// indexEventEnd returns the index of the closing brace of the leading JSON
+// object, or -1. Streams append CESR counters immediately after that brace.
+func indexEventEnd(raw []byte) int {
+	depth := 0
+	inString := false
+	escape := false
+	for i, b := range raw {
+		if inString {
+			if escape {
+				escape = false
+				continue
+			}
+			if b == '\\' {
+				escape = true
+				continue
+			}
+			if b == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch b {
+		case '"':
+			inString = true
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 // What this implementation can answer today.

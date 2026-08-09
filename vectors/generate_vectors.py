@@ -28,9 +28,18 @@ import json
 import sys
 
 from keri.core import coring, eventing
-from keri.core.coring import MtrDex
+from keri.core.coring import CtrDex, MtrDex
+from keri.vc import proving
+from keri.vdr import eventing as vdr_eventing
 
 VECTOR_VERSION = 1
+
+# Fixed wall-clock values so credential and TEL vectors regenerate identically.
+FIXED_DT_ISSUE = "2024-01-01T00:00:00.000000+00:00"
+FIXED_DT_REVOKE = "2024-06-01T00:00:00.000000+00:00"
+# Fixed salts/nonces — random ones would make every run a different file.
+FIXED_REGISTRY_NONCE = coring.Salter(raw=b"v" * 16).qb64
+FIXED_PRIVACY_SALT = coring.Salter(raw=b"s" * 16).qb64
 
 
 def signer(tag: str, transferable: bool = True) -> coring.Signer:
@@ -813,8 +822,693 @@ def cesr_code_cases():
             "ed25519_pubkey_nontransferable": MtrDex.Ed25519N,
             "ed25519_seed": MtrDex.Ed25519_Seed,
             "ed25519_sig": MtrDex.Ed25519_Sig,
+            # Attachment group introducers — what arrives on the wire after an event.
+            "controller_idx_sigs": CtrDex.ControllerIdxSigs,
+            "witness_idx_sigs": CtrDex.WitnessIdxSigs,
+            "nontrans_receipt_couples": CtrDex.NonTransReceiptCouples,
+            "trans_receipt_quadruples": CtrDex.TransReceiptQuadruples,
+            "attached_material_quadlets": CtrDex.AttachedMaterialQuadlets,
         },
     }]
+
+
+# ---------------------------------------------------------------------------
+# ACDC credentials, registries, issuance, revocation
+# ---------------------------------------------------------------------------
+
+def _saidified_schema():
+    """A minimal JSON schema whose $id is its own SAID — fixed for the vectors."""
+    schema = {
+        "$id": "",
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "TestCredential",
+        "description": "Schema used only by the conformance vectors",
+        "type": "object",
+        "properties": {
+            "d": {"type": "string"},
+            "i": {"type": "string"},
+            "dt": {"type": "string"},
+            "name": {"type": "string"},
+            "score": {"type": "integer"},
+        },
+        "additionalProperties": True,
+        "required": ["dt"],
+    }
+    _, saidified = coring.Saider.saidify(
+        sad=schema, kind=coring.Serials.json, label="$id",
+    )
+    return saidified
+
+
+def _credential_case(cid, why, creder, *, inputs, extra_expect=None):
+    """One ACDC: the SAID is the value a verifier must reproduce offline."""
+    sad = creder.sad if hasattr(creder, "sad") else creder.ked
+    exp = {
+        "raw_b64": base64.b64encode(creder.raw).decode(),
+        "said": creder.said,
+        "issuer": sad.get("i"),
+        "schema_said": sad.get("s"),
+        "registry": sad.get("ri"),
+        "subject_said": (sad.get("a") or {}).get("d"),
+        "credential_readable": sad,
+    }
+    if extra_expect:
+        exp.update(extra_expect)
+    return {
+        "id": cid,
+        "kind": "credential",
+        "why": why,
+        "input": inputs,
+        "expect": exp,
+    }
+
+
+def credential_cases():
+    out = []
+
+    schema = _saidified_schema()
+    schema_said = schema["$id"]
+    schema_raw = json.dumps(schema, separators=(",", ":")).encode()
+
+    # The schema itself is something a verifier holds; capture its SAID and bytes.
+    out.append({
+        "id": "acdc/schema/test-credential",
+        "kind": "credential",
+        "why": "A credential's schema SAID is part of what a verifier checks offline. "
+               "An implementation that recomputes a different SAID for the same schema "
+               "rejects every credential issued against it, or accepts forged ones.",
+        "input": {"schema": schema},
+        "expect": {
+            "raw_b64": base64.b64encode(schema_raw).decode(),
+            "said": schema_said,
+            "schema_readable": schema,
+        },
+    })
+
+    iss_cur, iss_nxt = signer("iss0"), signer("iss1")
+    issuer_icp = eventing.incept(
+        keys=[iss_cur.verfer.qb64], ndigs=[dig(iss_nxt)],
+    )
+    rec_cur, rec_nxt = signer("rec0"), signer("rec1")
+    recipient_icp = eventing.incept(
+        keys=[rec_cur.verfer.qb64], ndigs=[dig(rec_nxt)],
+    )
+
+    # Registry (TEL inception) — backerless, fixed nonce
+    reg = vdr_eventing.incept(
+        pre=issuer_icp.pre, toad=0, baks=[], nonce=FIXED_REGISTRY_NONCE,
+    )
+    out.append(case(
+        "acdc/registry/vcp-backerless",
+        "credential",
+        "A credential registry is itself a self-addressing identifier. An "
+        "implementation that formats the registry inception differently produces a "
+        "registry no issued credential will name, so every issuance fails to bind.",
+        {"issuer": issuer_icp.pre, "toad": 0, "backers": [],
+         "nonce": FIXED_REGISTRY_NONCE,
+         "issuer_inception_raw_b64": base64.b64encode(issuer_icp.raw).decode()},
+        reg,
+    ))
+
+    claims = {"name": "Alice", "dt": FIXED_DT_ISSUE, "score": 42}
+
+    # Credential issued INTO a registry
+    creder_reg = proving.credential(
+        schema=schema_said,
+        issuer=issuer_icp.pre,
+        data=dict(claims),
+        recipient=recipient_icp.pre,
+        status=reg.pre,
+    )
+    out.append(_credential_case(
+        "acdc/issued-into-registry",
+        "A registry-backed credential names its registry in ri, and its own SAID is "
+        "a digest of its canonical bytes. A verifier offline must recompute that SAID "
+        "exactly; any other serialisation means the credential cannot be checked.",
+        creder_reg,
+        inputs={
+            "schema_said": schema_said,
+            "issuer": issuer_icp.pre,
+            "recipient": recipient_icp.pre,
+            "registry": reg.pre,
+            "data": claims,
+        },
+    ))
+
+    # Credential issued WITHOUT a registry
+    creder_bare = proving.credential(
+        schema=schema_said,
+        issuer=issuer_icp.pre,
+        data=dict(claims),
+        recipient=recipient_icp.pre,
+        status=None,
+    )
+    out.append(_credential_case(
+        "acdc/issued-without-registry",
+        "Not every credential is registry-backed. Omitting ri is part of the "
+        "serialisation: inventing a registry field, or requiring one, produces a "
+        "different SAID and a credential no peer recognises.",
+        creder_bare,
+        inputs={
+            "schema_said": schema_said,
+            "issuer": issuer_icp.pre,
+            "recipient": recipient_icp.pre,
+            "registry": None,
+            "data": claims,
+        },
+    ))
+
+    # Issuance event (TEL iss) that places the credential in the registry
+    iss = vdr_eventing.issue(
+        vcdig=creder_reg.said, regk=reg.pre, dt=FIXED_DT_ISSUE,
+    )
+    out.append(case(
+        "acdc/issuance-event/iss",
+        "credential",
+        "Issuance is a TEL event whose identifier is the credential's SAID. An "
+        "implementation that digests the wrong fields, or that points ri at the "
+        "issuer rather than the registry, cannot be reconciled with any peer's TEL.",
+        {"credential_said": creder_reg.said, "registry": reg.pre,
+         "dt": FIXED_DT_ISSUE,
+         "credential_raw_b64": base64.b64encode(creder_reg.raw).decode(),
+         "registry_raw_b64": base64.b64encode(reg.raw).decode()},
+        iss,
+    ))
+
+    # Issuer anchors the iss into its KEL — the seal a verifier walks to
+    anchor_seal = [{"i": reg.pre, "s": iss.ked["s"], "d": iss.said}]
+    anchor = eventing.interact(
+        pre=issuer_icp.pre, dig=issuer_icp.said, sn=1, data=anchor_seal,
+    )
+    out.append(case(
+        "acdc/issuance-anchor/ixn",
+        "interaction",
+        "A registry issuance is only bound to the issuer when the issuer anchors it. "
+        "The seal carries the registry, the TEL sequence number and the iss SAID — "
+        "any other shape is not an issuance anchor and will not verify offline.",
+        {"prefix": issuer_icp.pre, "prior_said": issuer_icp.said, "sn": 1,
+         "data": anchor_seal,
+         "credential_said": creder_reg.said, "iss_said": iss.said,
+         "prior_event_raw_b64": base64.b64encode(issuer_icp.raw).decode()},
+        anchor,
+    ))
+
+    # Edge (link to another credential)
+    edge = {"n": creder_reg.said, "s": schema_said}
+    creder_edge = proving.credential(
+        schema=schema_said,
+        issuer=issuer_icp.pre,
+        data={"name": "Carol", "dt": FIXED_DT_ISSUE},
+        recipient=recipient_icp.pre,
+        status=reg.pre,
+        source=edge,
+    )
+    out.append(_credential_case(
+        "acdc/with-edge",
+        "An edge chains one credential to another. The edge is inside the SAID, so "
+        "dropping it, reordering it, or changing the nested schema reference produces "
+        "a different credential that no longer proves the link.",
+        creder_edge,
+        inputs={
+            "schema_said": schema_said,
+            "issuer": issuer_icp.pre,
+            "recipient": recipient_icp.pre,
+            "registry": reg.pre,
+            "data": {"name": "Carol", "dt": FIXED_DT_ISSUE},
+            "source": edge,
+        },
+    ))
+
+    # No edge (explicit contrast already covered by issued-into-registry)
+
+    # Rules section
+    rules = [{"l": "usageDisclaimer", "s": "use carefully"}]
+    creder_rules = proving.credential(
+        schema=schema_said,
+        issuer=issuer_icp.pre,
+        data={"name": "Dan", "dt": FIXED_DT_ISSUE},
+        recipient=recipient_icp.pre,
+        status=reg.pre,
+        rules=rules,
+    )
+    out.append(_credential_case(
+        "acdc/with-rules",
+        "Rules travel inside the credential and enter its SAID. An implementation "
+        "that strips the rules section, or that serialises it differently, produces "
+        "a credential whose digest no longer matches what was issued.",
+        creder_rules,
+        inputs={
+            "schema_said": schema_said,
+            "issuer": issuer_icp.pre,
+            "recipient": recipient_icp.pre,
+            "registry": reg.pre,
+            "data": {"name": "Dan", "dt": FIXED_DT_ISSUE},
+            "rules": rules,
+        },
+    ))
+
+    # Privacy-preserving ACDC (fixed salt) — the form selective disclosure builds on.
+    # keripy 1.1.17 exposes the private/salt path; a full partial-disclosure
+    # presentation API is not exercised here because it is not a pure function of
+    # fixed inputs in this version.
+    creder_private = proving.credential(
+        schema=schema_said,
+        issuer=issuer_icp.pre,
+        data={"name": "Eve", "dt": FIXED_DT_ISSUE, "score": 7},
+        recipient=recipient_icp.pre,
+        status=reg.pre,
+        private=True,
+        salt=FIXED_PRIVACY_SALT,
+    )
+    out.append(_credential_case(
+        "acdc/private-with-salt",
+        "A privacy-preserving credential carries a salt (u) at the top level and in "
+        "the subject. That salt is part of the SAID. An implementation that omits it, "
+        "or that generates a fresh one on read, cannot verify a credential it did not "
+        "itself issue — and selective disclosure depends on this form.",
+        creder_private,
+        inputs={
+            "schema_said": schema_said,
+            "issuer": issuer_icp.pre,
+            "recipient": recipient_icp.pre,
+            "registry": reg.pre,
+            "data": {"name": "Eve", "dt": FIXED_DT_ISSUE, "score": 7},
+            "private": True,
+            "salt": FIXED_PRIVACY_SALT,
+        },
+        extra_expect={"salt": FIXED_PRIVACY_SALT},
+    ))
+
+    # Revocation: state before (iss) already captured; rev event; after
+    rev = vdr_eventing.revoke(
+        vcdig=creder_reg.said, regk=reg.pre, dig=iss.said, dt=FIXED_DT_REVOKE,
+    )
+    out.append(case(
+        "acdc/revocation-event/rev",
+        "credential",
+        "Revocation is a TEL event that chains to the issuance by digest. An "
+        "implementation that does not require that link, or that leaves the "
+        "credential SAID pointing at a still-issued state, accepts revoked "
+        "credentials as valid.",
+        {"credential_said": creder_reg.said, "registry": reg.pre,
+         "prior_iss_said": iss.said, "dt": FIXED_DT_REVOKE,
+         "iss_raw_b64": base64.b64encode(iss.raw).decode(),
+         "credential_raw_b64": base64.b64encode(creder_reg.raw).decode()},
+        rev,
+    ))
+
+    # Before / after as explicit state markers a verifier can check against
+    out.append({
+        "id": "acdc/revocation-state/before-and-after",
+        "kind": "credential",
+        "why": "A verifier must know the TEL state of a credential: issued, then "
+               "revoked. Capturing both events and their order is what makes an "
+               "offline check decide correctly rather than assume 'present means valid'.",
+        "input": {
+            "credential_said": creder_reg.said,
+            "registry": reg.pre,
+            "iss_raw_b64": base64.b64encode(iss.raw).decode(),
+            "rev_raw_b64": base64.b64encode(rev.raw).decode(),
+        },
+        "expect": {
+            "credential_said": creder_reg.said,
+            "before": {
+                "ilk": "iss",
+                "said": iss.said,
+                "raw_b64": base64.b64encode(iss.raw).decode(),
+                "state": "issued",
+            },
+            "after": {
+                "ilk": "rev",
+                "said": rev.said,
+                "raw_b64": base64.b64encode(rev.raw).decode(),
+                "prior_said": iss.said,
+                "state": "revoked",
+            },
+        },
+    })
+
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Witness receipts
+# ---------------------------------------------------------------------------
+
+def receipt_cases():
+    out = []
+
+    cur, nxt = signer("a"), signer("b")
+    w1, w2, w3 = (
+        signer("w", transferable=False),
+        signer("x", transferable=False),
+        signer("y", transferable=False),
+    )
+    wits = [w1.verfer.qb64, w2.verfer.qb64, w3.verfer.qb64]
+    icp = eventing.incept(
+        keys=[cur.verfer.qb64], ndigs=[dig(nxt)], wits=wits, toad=2,
+    )
+    # Controller signature on the event (needed for a complete stream later)
+    controller_siger = cur.sign(ser=icp.raw, index=0)
+
+    # Receipt body for the inception (one event, many witnesses may sign it)
+    rct = eventing.receipt(pre=icp.pre, sn=0, said=icp.said)
+    out.append(case(
+        "rct/body/for-inception",
+        "receipt",
+        "A receipt names the event it covers by digest and sequence number. An "
+        "implementation that points a receipt at the wrong digest is not covering "
+        "the event it thinks it is, and peers will not count it toward the toad.",
+        {"prefix": icp.pre, "sn": 0, "event_said": icp.said,
+         "event_raw_b64": base64.b64encode(icp.raw).decode(),
+         "witnesses": wits, "toad": 2},
+        rct,
+    ))
+
+    # One witness receipt as a CESR stream (rct + nontrans couple)
+    cig1 = w1.sign(ser=icp.raw)
+    stream1 = bytes(eventing.messagize(serder=rct, cigars=[cig1]))
+    out.append({
+        "id": "rct/one-witness",
+        "kind": "receipt",
+        "why": "A single witness receipt is a stream: the receipt event plus a "
+               "non-transferable couple (witness identifier + cigar). Witnesses are "
+               "non-transferable, so the identifier IS the verifying key — capture "
+               "enough that a checker holding only the key event can verify the cigar.",
+        "input": {
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "event_said": icp.said,
+            "prefix": icp.pre,
+            "witness": w1.verfer.qb64,
+            "toad": 2,
+            "witnesses": wits,
+        },
+        "expect": {
+            "raw_b64": base64.b64encode(stream1).decode(),
+            "receipt_raw_b64": base64.b64encode(rct.raw).decode(),
+            "receipt_said": rct.said,
+            "witness": w1.verfer.qb64,
+            "cigar_qb64": cig1.qb64,
+            "counter": CtrDex.NonTransReceiptCouples,
+            "threshold_met": False,
+            "receipt_count": 1,
+            "toad": 2,
+        },
+    })
+
+    # Several witnesses for the same event
+    cig2 = w2.sign(ser=icp.raw)
+    cig3 = w3.sign(ser=icp.raw)
+    stream_multi = bytes(eventing.messagize(serder=rct, cigars=[cig1, cig2, cig3]))
+    out.append({
+        "id": "rct/three-witnesses",
+        "kind": "receipt",
+        "why": "Several witnesses sign the same event. The couples are ordered in the "
+               "attachment; an implementation that drops one, reorders them, or "
+               "deduplicates by key changes whether the toad is met.",
+        "input": {
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "event_said": icp.said,
+            "prefix": icp.pre,
+            "witnesses": wits,
+            "toad": 2,
+        },
+        "expect": {
+            "raw_b64": base64.b64encode(stream_multi).decode(),
+            "receipt_raw_b64": base64.b64encode(rct.raw).decode(),
+            "receipt_said": rct.said,
+            "couples": [
+                {"witness": w1.verfer.qb64, "cigar_qb64": cig1.qb64},
+                {"witness": w2.verfer.qb64, "cigar_qb64": cig2.qb64},
+                {"witness": w3.verfer.qb64, "cigar_qb64": cig3.qb64},
+            ],
+            "counter": CtrDex.NonTransReceiptCouples,
+            "threshold_met": True,
+            "receipt_count": 3,
+            "toad": 2,
+        },
+    })
+
+    # Threshold met (2 of toad 2) vs not met (1 of toad 2)
+    stream_met = bytes(eventing.messagize(serder=rct, cigars=[cig1, cig2]))
+    out.append({
+        "id": "rct/threshold/met",
+        "kind": "receipt",
+        "why": "The toad is met when enough designated witnesses have signed. An "
+               "implementation that miscounts, or that counts signatures from keys "
+               "not in the witness list, accepts events that are not fully witnessed.",
+        "input": {
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "event_said": icp.said,
+            "witnesses": wits,
+            "toad": 2,
+            "signing_witnesses": [w1.verfer.qb64, w2.verfer.qb64],
+        },
+        "expect": {
+            "raw_b64": base64.b64encode(stream_met).decode(),
+            "threshold_met": True,
+            "receipt_count": 2,
+            "toad": 2,
+        },
+    })
+    stream_unmet = bytes(eventing.messagize(serder=rct, cigars=[cig1]))
+    out.append({
+        "id": "rct/threshold/not-met",
+        "kind": "receipt",
+        "why": "One receipt against a toad of two is not enough. Treating it as met "
+               "lets an event proceed without the witness protection the identity "
+               "committed to at inception.",
+        "input": {
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "event_said": icp.said,
+            "witnesses": wits,
+            "toad": 2,
+            "signing_witnesses": [w1.verfer.qb64],
+        },
+        "expect": {
+            "raw_b64": base64.b64encode(stream_unmet).decode(),
+            "threshold_met": False,
+            "receipt_count": 1,
+            "toad": 2,
+        },
+    })
+
+    # Refusal: signature does not verify (tamper the cigar material)
+    bad_stream = bytearray(stream1)
+    # Flip a byte in the attachment (after the receipt JSON)
+    attach_at = len(rct.raw)
+    if attach_at + 20 < len(bad_stream):
+        bad_stream[attach_at + 15] ^= 0x01
+    out.append(reject_case(
+        "reject/receipt-signature-invalid",
+        "A receipt whose signature does not verify must be refused. Accepting it "
+        "counts a witness vote that was never cast, and the toad becomes meaningless.",
+        bytes(bad_stream),
+        because="the witness cigar does not verify under the witness identifier",
+        extra_input={
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "event_said": icp.said,
+            "witness": w1.verfer.qb64,
+            "good_stream_raw_b64": base64.b64encode(stream1).decode(),
+        },
+    ))
+
+    # Refusal: receipt from a witness the identity never designated
+    stranger = signer("stranger", transferable=False)
+    stranger_cig = stranger.sign(ser=icp.raw)
+    stranger_stream = bytes(eventing.messagize(serder=rct, cigars=[stranger_cig]))
+    out.append({
+        "id": "reject/receipt-from-undesignated-witness",
+        "kind": "reject",
+        "why": "Only witnesses named at establishment may contribute to the toad. A "
+               "receipt from anyone else must be refused — otherwise an attacker "
+               "supplies as many 'witnesses' as they need.",
+        "input": {
+            "raw_b64": base64.b64encode(stranger_stream).decode(),
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "event_said": icp.said,
+            "designated_witnesses": wits,
+            "stranger": stranger.verfer.qb64,
+            "because": "the signing identifier is not in the event's witness list",
+        },
+        "expect": {
+            "refused": True,
+            "because": "the signing identifier is not in the event's witness list",
+        },
+    })
+
+    # Carry the controller siger so stream cases can compose with this event
+    out.append({
+        "id": "rct/context/event-and-controller-sig",
+        "kind": "receipt",
+        "why": "Receipts are checked against a specific event. Capturing the event "
+               "bytes and the controller signature together is what lets a later "
+               "implementation verify 'this is the event, this is who ran it, these "
+               "are the witnesses' without inventing any of the three.",
+        "input": {
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "witnesses": wits,
+            "toad": 2,
+        },
+        "expect": {
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "event_said": icp.said,
+            "aid": icp.pre,
+            "controller_siger_qb64": controller_siger.qb64,
+            "controller_key": cur.verfer.qb64,
+            "toad": 2,
+            "witnesses": wits,
+        },
+    })
+
+    return out
+
+
+# ---------------------------------------------------------------------------
+# CESR attachments and streams
+# ---------------------------------------------------------------------------
+
+def stream_cases():
+    out = []
+
+    cur, nxt = signer("a"), signer("b")
+    w1, w2 = signer("w", transferable=False), signer("x", transferable=False)
+    icp = eventing.incept(
+        keys=[cur.verfer.qb64], ndigs=[dig(nxt)],
+        wits=[w1.verfer.qb64, w2.verfer.qb64], toad=1,
+    )
+    siger = cur.sign(ser=icp.raw, index=0)
+    cig1 = w1.sign(ser=icp.raw)
+    cig2 = w2.sign(ser=icp.raw)
+
+    # Event + one controller signature
+    stream_one = bytes(eventing.messagize(serder=icp, sigers=[siger]))
+    out.append({
+        "id": "stream/controller-sig/single",
+        "kind": "stream",
+        "why": "Events travel with their controller signature attached in a counted "
+               "CESR stream. An implementation that can build events but cannot parse "
+               "the attachment cannot accept anything that arrives on the wire.",
+        "input": {
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "controller_keys": [cur.verfer.qb64],
+            "sigers_qb64": [siger.qb64],
+        },
+        "expect": {
+            "raw_b64": base64.b64encode(stream_one).decode(),
+            "event_said": icp.said,
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "attachment_b64": base64.b64encode(stream_one[len(icp.raw):]).decode(),
+            "counters": [
+                {"code": CtrDex.ControllerIdxSigs, "name": "ControllerIdxSigs"},
+            ],
+            "signature_count": 1,
+        },
+    })
+
+    # Multi-controller signatures (2-of-3)
+    k1, k2, k3 = signer("m"), signer("n"), signer("o")
+    n1, n2, n3 = signer("p"), signer("q"), signer("r")
+    icp3 = eventing.incept(
+        keys=[k1.verfer.qb64, k2.verfer.qb64, k3.verfer.qb64],
+        ndigs=[dig(n1), dig(n2), dig(n3)],
+        isith="2", nsith="2",
+    )
+    sigers3 = [k1.sign(ser=icp3.raw, index=0), k2.sign(ser=icp3.raw, index=1)]
+    stream_multi = bytes(eventing.messagize(serder=icp3, sigers=sigers3))
+    out.append({
+        "id": "stream/controller-sig/two-of-three",
+        "kind": "stream",
+        "why": "A multi-key identity attaches one indexed signature per signing key. "
+               "Losing the index, reordering the sigers, or requiring all keys when "
+               "the threshold is 2-of-3 breaks every multi-sig exchange.",
+        "input": {
+            "event_raw_b64": base64.b64encode(icp3.raw).decode(),
+            "controller_keys": [k1.verfer.qb64, k2.verfer.qb64, k3.verfer.qb64],
+            "isith": "2",
+            "sigers_qb64": [s.qb64 for s in sigers3],
+            "indices": [0, 1],
+        },
+        "expect": {
+            "raw_b64": base64.b64encode(stream_multi).decode(),
+            "event_said": icp3.said,
+            "event_raw_b64": base64.b64encode(icp3.raw).decode(),
+            "attachment_b64": base64.b64encode(stream_multi[len(icp3.raw):]).decode(),
+            "counters": [
+                {"code": CtrDex.ControllerIdxSigs, "name": "ControllerIdxSigs"},
+            ],
+            "signature_count": 2,
+            "indices": [0, 1],
+        },
+    })
+
+    # Event + controller sig + witness receipt couples
+    stream_wit = bytes(eventing.messagize(
+        serder=icp, sigers=[siger], cigars=[cig1, cig2],
+    ))
+    out.append({
+        "id": "stream/controller-sig-and-witness-receipts",
+        "kind": "stream",
+        "why": "A fully witnessed message carries the controller signature group and "
+               "the non-transferable receipt couples in one stream. The counter codes "
+               "that introduce each group (-A, -C) are how a parser knows what follows; "
+               "getting them wrong makes the rest of the stream unreadable.",
+        "input": {
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "controller_keys": [cur.verfer.qb64],
+            "witnesses": [w1.verfer.qb64, w2.verfer.qb64],
+            "sigers_qb64": [siger.qb64],
+            "cigars_qb64": [cig1.qb64, cig2.qb64],
+        },
+        "expect": {
+            "raw_b64": base64.b64encode(stream_wit).decode(),
+            "event_said": icp.said,
+            "event_raw_b64": base64.b64encode(icp.raw).decode(),
+            "attachment_b64": base64.b64encode(stream_wit[len(icp.raw):]).decode(),
+            "counters": [
+                {"code": CtrDex.ControllerIdxSigs, "name": "ControllerIdxSigs"},
+                {"code": CtrDex.NonTransReceiptCouples, "name": "NonTransReceiptCouples"},
+            ],
+            "signature_count": 1,
+            "receipt_count": 2,
+        },
+    })
+
+    # Counter codes alone — explicit so a stream parser can be written against them
+    out.append({
+        "id": "stream/counter-codes",
+        "kind": "constants",
+        "why": "Attachment groups are introduced by fixed CESR counter codes. An "
+               "implementation that invents its own introducers cannot exchange "
+               "signed events with any other KERI implementation.",
+        "input": {},
+        "expect": {
+            "ControllerIdxSigs": CtrDex.ControllerIdxSigs,
+            "WitnessIdxSigs": CtrDex.WitnessIdxSigs,
+            "NonTransReceiptCouples": CtrDex.NonTransReceiptCouples,
+            "TransReceiptQuadruples": CtrDex.TransReceiptQuadruples,
+            "AttachedMaterialQuadlets": CtrDex.AttachedMaterialQuadlets,
+            "example_stream_starts_with_event": True,
+            "example_attachment_prefix": bytes(stream_one[len(icp.raw):len(icp.raw)+4]).decode(),
+        },
+    })
+
+    # Truncated stream — refusal
+    truncated = stream_one[:-8]
+    out.append(reject_case(
+        "reject/stream-truncated",
+        "A truncated CESR stream must be refused. Accepting a partial attachment "
+        "treats a missing signature as present, or fails later in a way that looks "
+        "like a different bug.",
+        truncated,
+        because="the stream ends before the attached material is complete",
+        extra_input={
+            "full_stream_raw_b64": base64.b64encode(stream_one).decode(),
+            "event_said": icp.said,
+        },
+    ))
+
+    return out
 
 
 def main():
@@ -824,6 +1518,9 @@ def main():
     cases += rotation_cases()
     cases += interaction_cases()
     cases += delegation_cases()
+    cases += credential_cases()
+    cases += receipt_cases()
+    cases += stream_cases()
     cases += identifier_property_cases()
     cases += rejection_cases()
 
