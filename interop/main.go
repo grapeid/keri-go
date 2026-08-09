@@ -2,16 +2,21 @@
 // KERI implementation to judge.
 //
 // The conformance suite proves one direction: given keripy's inputs, this
-// package reproduces keripy's bytes. That is not the same as interoperating.
-// It says nothing about whether keripy ACCEPTS what this package produces —
-// a stricter question, because acceptance runs the reference's own validator
-// over our output rather than comparing two strings.
+// package reproduces keripy's bytes. That is not the same as interoperating —
+// it says nothing about whether keripy ACCEPTS what this package produces, a
+// stricter question because acceptance runs the reference's own validator over
+// our output rather than comparing two strings.
 //
-// This writes a stream to stdout. tools/verify_interop.py feeds it to keripy.
+// Everything here goes through the package's public API — key derivation,
+// signing, and attachment framing included. An earlier version hand-rolled
+// those three in this file, which meant the harness proved the encoding in this
+// file was right rather than the encoding the library ships.
+//
+// Writes a stream to stdout. interop/verify_interop.py feeds it to keripy.
 package main
 
 import (
-	"crypto/ed25519"
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -20,47 +25,13 @@ import (
 	keri "github.com/grapeid/keri-go"
 )
 
-// seedFor derives a deterministic key, the same way the vector generator does,
-// so a failure is about the event and never about which key was used.
-func seedFor(tag byte) ed25519.PrivateKey {
-	seed := make([]byte, ed25519.SeedSize)
-	for i := range seed {
-		seed[i] = tag
-	}
-	return ed25519.NewKeyFromSeed(seed)
-}
-
-// qb64Key renders a public key the way CESR writes a transferable one: the
-// code, then the key padded into base64 the way CESR pads it.
-func qb64Key(pub ed25519.PublicKey) string {
-	padded := append([]byte{0}, pub...)
-	return keri.CodeEd25519 + base64.RawURLEncoding.EncodeToString(padded)[1:]
-}
-
-func qb64Digest(of string) string {
-	said, err := keri.Blake3SAID([]byte(of))
-	if err != nil {
-		panic(err)
-	}
-	return said
-}
-
-// signIndexed frames a signature as an indexed controller signature.
-func signIndexed(priv ed25519.PrivateKey, event []byte, index int) string {
-	sig := ed25519.Sign(priv, event)
-	padded := append([]byte{0, 0}, sig...)
-	body := base64.RawURLEncoding.EncodeToString(padded)[2:]
-	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-	return "A" + string(alphabet[index]) + body
-}
-
-func attach(sigs []string) string {
-	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-	out := "-A" + "A" + string(alphabet[len(sigs)])
-	for _, s := range sigs {
-		out += s
-	}
-	return out
+// signerFor derives a deterministic key, so a failure is about the event and
+// never about which key was used. A real identity uses keri.GenerateSigner.
+func signerFor(tag byte) keri.Signer {
+	seed := bytes.Repeat([]byte{tag}, 32)
+	s, err := keri.NewSoftwareSigner(seed, true)
+	must(err)
+	return s
 }
 
 type message struct {
@@ -71,26 +42,34 @@ type message struct {
 }
 
 func main() {
-	a, b, c := seedFor('a'), seedFor('b'), seedFor('c')
-	pubA := a.Public().(ed25519.PublicKey)
-	pubB := b.Public().(ed25519.PublicKey)
-	pubC := c.Public().(ed25519.PublicKey)
+	a, b, c := signerFor('a'), signerFor('b'), signerFor('c')
+	pubA, err := a.PublicKey()
+	must(err)
+	pubB, err := b.PublicKey()
+	must(err)
+	pubC, err := c.PublicKey()
+	must(err)
+
+	nextB, err := keri.NextDigest(pubB)
+	must(err)
+	nextC, err := keri.NextDigest(pubC)
+	must(err)
 
 	var out []message
-	emit := func(label, why string, event []byte, priv ed25519.PrivateKey) {
-		sig := signIndexed(priv, event, 0)
-		msg := append(append([]byte{}, event...), []byte(attach([]string{sig}))...)
+	emit := func(label, why string, event []byte, signers ...keri.Signer) {
+		signed, err := keri.SignEvent(event, signers...)
+		must(err)
 		out = append(out, message{
 			Label: label,
 			Why:   why,
-			Event: base64.StdEncoding.EncodeToString(event),
-			Msg:   base64.StdEncoding.EncodeToString(msg),
+			Event: base64.StdEncoding.EncodeToString(signed.Event),
+			Msg:   base64.StdEncoding.EncodeToString(signed.Message),
 		})
 	}
 
 	icp, err := keri.BuildInception(keri.InceptionInput{
-		Keys:        []string{qb64Key(pubA)},
-		NextDigests: []string{qb64Digest(qb64Key(pubB))},
+		Keys:        []string{pubA},
+		NextDigests: []string{nextB},
 	})
 	must(err)
 	emit("icp/single-key", "the simplest identity there is", icp, a)
@@ -105,24 +84,48 @@ func main() {
 		Data:      []json.RawMessage{},
 	})
 	must(err)
-	emit("ixn/no-seals", "an interaction anchoring nothing", ixn, a)
+	emit("ixn/no-seals", "an interaction, signed by the key in force", ixn, a)
 
 	ixnEv, err := keri.ParseEvent(ixn)
 	must(err)
 
 	rot, err := keri.BuildRotation(keri.RotationInput{
 		Prefix:      icpEv.Identifier,
-		Keys:        []string{qb64Key(pubB)},
+		Keys:        []string{pubB},
 		PriorSAID:   ixnEv.SAID,
 		SN:          2,
-		NextDigests: []string{qb64Digest(qb64Key(pubC))},
+		NextDigests: []string{nextC},
 	})
 	must(err)
-	emit("rot/to-precommitted-key", "rotating to the key the inception committed to", rot, b)
+	emit("rot/to-precommitted-key",
+		"rotating to the key the inception committed to by digest", rot, b)
+
+	// A two-key identity, to exercise indexed signatures rather than only the
+	// single-signature case where every index is zero.
+	d, e := signerFor('d'), signerFor('e')
+	pubD, err := d.PublicKey()
+	must(err)
+	pubE, err := e.PublicKey()
+	must(err)
+	nextPair := []string{mustDigest(pubD), mustDigest(pubE)}
+	multi, err := keri.BuildInception(keri.InceptionInput{
+		Keys:        []string{pubA, pubC},
+		Isith:       json.RawMessage(`"2"`),
+		NextDigests: nextPair,
+		Nsith:       json.RawMessage(`"2"`),
+	})
+	must(err)
+	emit("icp/two-of-two", "both keys must sign, so both indices must be right", multi, a, c)
 
 	if err := json.NewEncoder(os.Stdout).Encode(out); err != nil {
 		must(err)
 	}
+}
+
+func mustDigest(pub string) string {
+	d, err := keri.NextDigest(pub)
+	must(err)
+	return d
 }
 
 func must(err error) {
