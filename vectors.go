@@ -48,7 +48,10 @@ type Case struct {
 	Kind string `json:"kind"`
 	// Why this case exists. Carried in the data so a failure explains what it
 	// means rather than only what differed.
-	Why    string          `json:"why"`
+	Why string `json:"why"`
+	// Assert names the property a "property" case states, so the assertion is
+	// read from the vector rather than inferred from the case id.
+	Assert string          `json:"assert"`
 	Input  json.RawMessage `json:"input"`
 	Expect Expectation     `json:"expect"`
 }
