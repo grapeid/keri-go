@@ -154,3 +154,36 @@ func ValidateDelegation(delegated []byte, delegatorKEL [][]byte) error {
 	return fmt.Errorf("%s at sn %d (%s) is not anchored anywhere in %s's key log, so the "+
 		"delegation is unauthorised", ev.Identifier, ev.SN, ev.SAID, delegator.Identifier)
 }
+
+// ValidateDelegationSigned is ValidateDelegation over a delegator log that
+// carries its signatures.
+//
+// Prefer it. ValidateDelegation checks that the approving seal is present in a
+// structurally sound log, which is worth something but not everything: a seal
+// lives in an interaction event, and an interaction carries no keys of its own,
+// so nothing in a bare key log attests that the delegator produced it. Anyone
+// able to hand you bytes could fabricate an interaction anchoring any delegation
+// they liked.
+//
+// This variant verifies every event in the delegator's log against the key state
+// that log establishes, so the interaction holding the seal has been signed by
+// the delegator's established keys before the seal is read.
+func ValidateDelegationSigned(delegated []byte, delegatorMessages [][]byte) error {
+	if len(delegatorMessages) == 0 {
+		return fmt.Errorf("no delegator log was supplied, so whether the delegation was " +
+			"authorised cannot be established")
+	}
+	if _, err := ValidateSignedKEL(delegatorMessages); err != nil {
+		return fmt.Errorf("the delegator's log is not verifiably theirs, so nothing "+
+			"anchored in it can be relied on: %w", err)
+	}
+	events := make([][]byte, 0, len(delegatorMessages))
+	for i, msg := range delegatorMessages {
+		raw, _, err := splitStream(msg)
+		if err != nil {
+			return fmt.Errorf("delegator message %d is not an event with attachments: %w", i, err)
+		}
+		events = append(events, raw)
+	}
+	return ValidateDelegation(delegated, events)
+}

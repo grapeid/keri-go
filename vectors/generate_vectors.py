@@ -1200,6 +1200,7 @@ def receipt_cases():
             "event_said": icp.said,
             "prefix": icp.pre,
             "witness": w1.verfer.qb64,
+            "cigar_qb64": cig1.qb64,
             "toad": 2,
             "witnesses": wits,
         },
@@ -1231,6 +1232,11 @@ def receipt_cases():
             "event_said": icp.said,
             "prefix": icp.pre,
             "witnesses": wits,
+            "couples": [
+                {"witness": w1.verfer.qb64, "cigar_qb64": cig1.qb64},
+                {"witness": w2.verfer.qb64, "cigar_qb64": cig2.qb64},
+                {"witness": w3.verfer.qb64, "cigar_qb64": cig3.qb64},
+            ],
             "toad": 2,
         },
         "expect": {
@@ -1263,6 +1269,10 @@ def receipt_cases():
             "witnesses": wits,
             "toad": 2,
             "signing_witnesses": [w1.verfer.qb64, w2.verfer.qb64],
+            "couples": [
+                {"witness": w1.verfer.qb64, "cigar_qb64": cig1.qb64},
+                {"witness": w2.verfer.qb64, "cigar_qb64": cig2.qb64},
+            ],
         },
         "expect": {
             "raw_b64": base64.b64encode(stream_met).decode(),
@@ -1284,6 +1294,9 @@ def receipt_cases():
             "witnesses": wits,
             "toad": 2,
             "signing_witnesses": [w1.verfer.qb64],
+            "couples": [
+                {"witness": w1.verfer.qb64, "cigar_qb64": cig1.qb64},
+            ],
         },
         "expect": {
             "raw_b64": base64.b64encode(stream_unmet).decode(),

@@ -38,6 +38,8 @@ const (
 	CodeEd25519N = "B"
 	// CodeEd25519Sig marks a signature.
 	CodeEd25519Sig = "0B"
+	// CodeEd25519Seed marks an Ed25519 private-key seed.
+	CodeEd25519Seed = "A"
 )
 
 // MatterQB64 encodes raw bytes with a CESR code.

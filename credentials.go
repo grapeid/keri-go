@@ -1185,10 +1185,10 @@ func AnswerCredential(c Case) ([]byte, error) {
 	case probe.CredentialSAID != "":
 		// A credential's TEL state before and after revocation. This case
 		// states no serialisation to produce — its expectation is a pair of
-		// state markers — so it is asserted by its own test, the way the
-		// property and rejection cases are, rather than by returning bytes.
-		// See TestCredentialTELState.
-		return nil, ErrNotImplemented
+		// state markers — so it is asserted by the conformance harness, the
+		// way the property and rejection cases are, rather than by returning
+		// bytes. See assertRevocationState / TestCredentialTELState.
+		return nil, errAnsweredByAssert
 
 	default:
 		return nil, fmt.Errorf("this credential case names nothing this knows how to build")
