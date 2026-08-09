@@ -161,6 +161,21 @@ func TestConformance(t *testing.T) {
 	for _, c := range vf.Cases {
 		c := c
 		t.Run(c.ID, func(t *testing.T) {
+			// Refusals and properties assert a verdict rather than bytes, so
+			// they are answered by their own assertions instead of by Answer.
+			// They are counted as answered: a case that is checked here is not
+			// "still to implement", and reporting it as such would understate
+			// exactly the work that decides whether a stranger is trusted.
+			switch c.Kind {
+			case "reject":
+				assertRefused(t, c)
+				done++
+				return
+			case "property":
+				assertProperty(t, c)
+				done++
+				return
+			}
 			got, err := Answer(c)
 			switch {
 			case err == ErrNotImplemented:
