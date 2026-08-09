@@ -1,2 +1,5 @@
+
+# Rust build output for the keriox interop harness.
 .claude/
 .venv/
+interop-keriox/target/

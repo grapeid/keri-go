@@ -1,0 +1,24 @@
+[package]
+name = "interop-keriox"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Upstream keriox, pinned to a commit.
+#
+# Upstream on purpose, and not the copy embedded in the mobile app. keripy
+# generated the vectors this package was built against, so keripy agreeing with
+# us partly reflects that shared origin. keriox did not, which makes it the
+# first judge whose agreement is not circular. The embedded copy would be worse
+# still: it is not known to be correct, so if it and this package are wrong in
+# the same way, the test says nothing.
+#
+# A pinned rev rather than a branch, so the thing we tested against is a named
+# commit somebody can check out, and a bump is a reviewable diff.
+[dependencies]
+keri-core = { git = "https://github.com/THCLab/keriox", rev = "ddcd2aba2de6199ec776ea5b1affdf5819dca410" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+cesrox = { version = "0.1.8", features = ["cesr-proof"] }
+tempfile = "3"
