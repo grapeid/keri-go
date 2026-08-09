@@ -213,30 +213,116 @@ func main() {
 
 	// ---- credentials and their transaction events -------------------------
 
-	emitCredentials(icpEv.Identifier)
+	emitCredentials(signerFor('t', true), signerFor('u', true))
 
 	if err := json.NewEncoder(os.Stdout).Encode(cases); err != nil {
 		must(err)
 	}
 }
 
-// emitCredentials builds a registry, a credential and its issuance and
-// revocation, so keripy can judge the ACDC side too.
-func emitCredentials(issuer string) {
-	registry, err := keri.BuildRegistryInception(keri.RegistryInput{
-		Issuer: issuer,
-		Nonce:  "0ADYvfKAeqRVAyc-Gu0Zc7SN",
+// emitCredentials builds the whole credential chain — an issuer, its registry,
+// a credential, the issuance and the revocation — with every transaction event
+// anchored in the issuer's key log, which is what makes a Tevery accept it.
+//
+// A transaction event on its own is unanchored and means nothing: the issuer's
+// key log is what says the issuance happened and when, so anchoring is not
+// ceremony, it is the whole evidential basis.
+func emitCredentials(ia, ib keri.Signer) {
+	issuerIcp, err := keri.BuildInception(keri.InceptionInput{
+		Keys: []string{pub(ia)}, NextDigests: []string{digestOf(ib)},
 	})
-	if err != nil {
-		cases = append(cases, kase{Label: "vcp/registry", Kind: "tel",
-			Skipped: fmt.Sprintf("could not build a registry: %v", err)})
-		return
-	}
+	must(err)
+	issuerEv := emitKEL("icp/credential-issuer", "the identity that issues", issuerIcp, ia)
+	issuer := issuerEv.Identifier
+
+	registry, err := keri.BuildRegistryInception(keri.RegistryInput{
+		Issuer: issuer, Nonce: "0ADYvfKAeqRVAyc-Gu0Zc7SN",
+	})
+	must(err)
+	regSAID := saidOfEvent(registry)
+
+	// The issuer anchors the registry in its own log.
+	anchorReg := anchorSeal(ia, issuer, issuerEv.SAID, 1, regSAID, regSAID, "0")
 	cases = append(cases, kase{
 		Label: "vcp/registry-inception", Kind: "tel",
-		Why:   "a credential registry, which issuances are recorded against",
-		Event: b64(registry), Issuer: issuer,
+		Why:   "a credential registry, anchored in the issuer's key log",
+		Event: b64(registry), Msg: b64(anchorReg.Message), Issuer: issuer,
 	})
+
+	schema := "EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
+	cred, err := keri.BuildCredential(keri.CredentialInput{
+		SchemaSAID: schema, Issuer: issuer,
+		Recipient: "EHtQ1cqprq_XvngppRKybLalrmvpImmoPRojhfSNpgna",
+		Registry:  regSAID,
+		Data:      json.RawMessage(`{"dt":"2024-01-01T00:00:00.000000+00:00","LEI":"254900OPPU84GM83MG36"}`),
+	})
+	must(err)
+	credSAID := saidOfEvent(cred)
+	cases = append(cases, kase{
+		Label: "acdc/credential", Kind: "credential",
+		Why:   "the credential document itself, whose identifier is a digest of its contents",
+		Event: b64(cred), Issuer: issuer,
+	})
+
+	iss, err := keri.BuildIssuance(keri.IssuanceInput{
+		CredentialSAID: credSAID, Registry: regSAID,
+		DT: "2024-01-01T00:00:00.000000+00:00",
+	})
+	must(err)
+	issSAID := saidOfEvent(iss)
+	anchorIss := anchorSeal(ia, issuer, anchorReg.eventSAID, 2, credSAID, issSAID, "0")
+	cases = append(cases, kase{
+		Label: "iss/credential-issued", Kind: "tel",
+		Why: "the issuance, anchored in the issuer's log — this is what makes the " +
+			"credential live rather than merely well formed",
+		Event: b64(iss), Msg: b64(anchorIss.Message), Issuer: issuer,
+	})
+
+	rev, err := keri.BuildRevocation(keri.RevocationInput{
+		CredentialSAID: credSAID, Registry: regSAID, PriorISSSAID: issSAID,
+		DT: "2024-06-01T00:00:00.000000+00:00",
+	})
+	must(err)
+	anchorRev := anchorSeal(ia, issuer, anchorIss.eventSAID, 3, credSAID, saidOfEvent(rev), "1")
+	cases = append(cases, kase{
+		Label: "rev/credential-revoked", Kind: "tel",
+		Why: "the revocation; a verifier that cannot see this treats a revoked " +
+			"credential as valid",
+		Event: b64(rev), Msg: b64(anchorRev.Message), Issuer: issuer,
+	})
+}
+
+type anchored struct {
+	Message   []byte
+	eventSAID string
+}
+
+// anchorSeal builds and signs an interaction committing a transaction event
+// into the issuer's key log.
+func anchorSeal(signer keri.Signer, prefix, priorSAID string, sn int,
+	sealI, sealD, sealS string) anchored {
+
+	seal := json.RawMessage(fmt.Sprintf(`{"i":%q,"s":%q,"d":%q}`, sealI, sealS, sealD))
+	ixn, err := keri.BuildInteraction(keri.InteractionInput{
+		Prefix: prefix, PriorSAID: priorSAID, SN: sn,
+		Data: []json.RawMessage{seal},
+	})
+	must(err)
+	signed, err := keri.SignEvent(ixn, signer)
+	must(err)
+	return anchored{Message: signed.Message, eventSAID: saidOfEvent(ixn)}
+}
+
+func saidOfEvent(raw []byte) string {
+	var m struct {
+		D string `json:"d"`
+		I string `json:"i"`
+	}
+	must(json.Unmarshal(raw, &m))
+	if m.I != "" && m.D == m.I {
+		return m.I
+	}
+	return m.D
 }
 
 func mustCigar(sig []byte) string {

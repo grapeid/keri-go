@@ -19,6 +19,7 @@ import sys
 from keri.core import eventing, parsing, serdering
 from keri.db import basing
 from keri.vdr import eventing as vdr_eventing
+from keri.vdr import viring
 
 
 def d(b64):
@@ -65,23 +66,55 @@ def judge_delegation(kvy, case):
     return True, f"delegated identity established, sn={kever.sn}"
 
 
-def judge_tel(db, case):
-    """Transaction events are judged by a Tevery, not a Kevery."""
-    serder = serdering.SerderKERI(raw=d(case["event_b64"]))
-    # Re-parsing is the check that matters here: a registry inception is a
-    # self-addressing event, so keripy recomputing its identifier from our bytes
-    # and getting the same answer is the interoperable property.
-    if serder.said != json.loads(d(case["event_b64"]))["d"]:
-        return False, "keripy recomputed a different identifier from these bytes"
-    return True, f"{serder.ked['t']} {serder.said}"
+def judge_tel(kvy, tvy, case):
+    """A transaction event, checked as far as this package can currently be checked.
+
+    This is deliberately WEAKER than acceptance, and says so. A TEL event travels
+    with a source seal couple naming the event in the issuer's key log that
+    anchors it, and keri-go does not build that attachment yet — so keripy's
+    Tevery cannot be handed one of our transaction events at all. Feeding it a
+    bare event does not fail, it BLOCKS: the CESR parser waits for the
+    attachment it knows should follow.
+
+    What is checked here is that keripy recomputes the same identifier from our
+    bytes. Combined with the byte-for-byte comparison in credentials_tel_test.go,
+    that establishes the event body is right. It does not establish that the
+    reference would accept it in a stream, and nothing here should be read as
+    claiming otherwise.
+    """
+    if case.get("message_b64"):
+        parsing.Parser(kvy=kvy).parse(ims=bytearray(d(case["message_b64"])))
+        kvy.processEscrows()
+    raw = d(case["event_b64"])
+    serder = serdering.SerderKERI(raw=raw)
+    if serder.said != json.loads(raw)["d"]:
+        return False, "keripy recomputes a different identifier from these bytes"
+    return True, f"{serder.ked['t']} body verified (not stream-accepted — see docstring)"
+
+
+def judge_credential(case):
+    """A credential is a document: its identifier must be a digest of itself."""
+    raw = d(case["event_b64"])
+    sad = json.loads(raw)
+    from keri.core import coring
+    said = sad["d"]
+    # Recompute with keripy's own saidify, which is the interoperable check.
+    from keri.core.coring import Saider
+    _, recomputed = Saider.saidify(sad=dict(sad))
+    if recomputed["d"] != said:
+        return False, (f"keripy recomputes this credential's identifier as "
+                       f"{recomputed['d']}, the credential says {said}")
+    return True, f"identifier verified {said}"
 
 
 def main():
     cases = json.load(sys.stdin)
     accepted, refused, skipped = 0, 0, 0
 
-    with basing.openDB(name="interop") as db:
+    with basing.openDB(name="interop") as db, viring.openReger(name="interop") as reger:
         kvy = eventing.Kevery(db=db, lax=True, local=True)
+        tvy = vdr_eventing.Tevery(reger=reger, db=db, lax=True, local=True)
+
         for case in cases:
             label, kind = case["label"], case.get("kind", "kel")
             if case.get("skipped"):
@@ -94,7 +127,9 @@ def main():
                 elif kind == "delegation":
                     ok, detail = judge_delegation(kvy, case)
                 elif kind == "tel":
-                    ok, detail = judge_tel(db, case)
+                    ok, detail = judge_tel(kvy, tvy, case)
+                elif kind == "credential":
+                    ok, detail = judge_credential(case)
                 else:
                     ok, detail = False, f"no judge for kind {kind!r}"
             except Exception as exc:  # noqa: BLE001 — report, never mask
