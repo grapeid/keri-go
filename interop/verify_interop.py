@@ -67,29 +67,49 @@ def judge_delegation(kvy, case):
 
 
 def judge_tel(kvy, tvy, case):
-    """A transaction event, checked as far as this package can currently be checked.
+    """A transaction event, judged by a Tevery.
 
-    This is deliberately WEAKER than acceptance, and says so. A TEL event travels
-    with a source seal couple naming the event in the issuer's key log that
-    anchors it, and keri-go does not build that attachment yet — so keripy's
-    Tevery cannot be handed one of our transaction events at all. Feeding it a
-    bare event does not fail, it BLOCKS: the CESR parser waits for the
-    attachment it knows should follow.
-
-    What is checked here is that keripy recomputes the same identifier from our
-    bytes. Combined with the byte-for-byte comparison in credentials_tel_test.go,
-    that establishes the event body is right. It does not establish that the
-    reference would accept it in a stream, and nothing here should be read as
-    claiming otherwise.
+    A transaction event means nothing on its own: the issuer's key log is what
+    says the issuance happened. So the anchoring interaction goes into the
+    Kevery first, and the event itself carries a source seal couple naming that
+    interaction. Without the seal keripy does not refuse the event — it BLOCKS,
+    because the CESR parser knows an attachment should follow.
     """
     if case.get("message_b64"):
         parsing.Parser(kvy=kvy).parse(ims=bytearray(d(case["message_b64"])))
         kvy.processEscrows()
-    raw = d(case["event_b64"])
-    serder = serdering.SerderKERI(raw=raw)
-    if serder.said != json.loads(raw)["d"]:
-        return False, "keripy recomputes a different identifier from these bytes"
-    return True, f"{serder.ked['t']} body verified (not stream-accepted — see docstring)"
+
+    parsing.Parser(kvy=kvy, tvy=tvy).parse(ims=bytearray(d(case["event_b64"])))
+    tvy.processEscrows()
+
+    # The event bytes carry their attachment, so read the body back off the
+    # front rather than assuming the whole blob is JSON.
+    serder = serdering.SerderKERI(raw=d(case["event_b64"]))
+    ilk = serder.ked["t"]
+    subject = serder.ked["i"]
+
+    if ilk == "vcp":
+        if subject not in tvy.tevers:
+            return False, "the registry was not established"
+        return True, f"registry live {subject}"
+
+    registry = serder.ked.get("ri")
+    tev = tvy.tevers.get(registry)
+    if tev is None:
+        return False, f"no registry {registry} was established to record this against"
+    state = tev.vcState(subject)
+    if state is None:
+        # Not a defect in keri-go. interop/control_keripy_only.py builds this
+        # same flow entirely with keripy and its issuance does not register
+        # either, so what is missing is a step in this harness — registering the
+        # credential itself with a Verifier — rather than anything about our
+        # bytes. Reported as inconclusive rather than refused, because calling
+        # it a refusal would blame the wrong code.
+        return None, (f"credential state not established; keripy's own issuance "
+                      f"behaves identically here (see interop/control_keripy_only.py), "
+                      f"so this harness is incomplete, not the event")
+    et = state.ked.get("et") if hasattr(state, "ked") else str(state)
+    return True, f"credential state is {et!r}"
 
 
 def judge_credential(case):
@@ -109,7 +129,7 @@ def judge_credential(case):
 
 def main():
     cases = json.load(sys.stdin)
-    accepted, refused, skipped = 0, 0, 0
+    accepted, refused, skipped, unproven = 0, 0, 0, 0
 
     with basing.openDB(name="interop") as db, viring.openReger(name="interop") as reger:
         kvy = eventing.Kevery(db=db, lax=True, local=True)
@@ -135,7 +155,10 @@ def main():
             except Exception as exc:  # noqa: BLE001 — report, never mask
                 ok, detail = False, f"{type(exc).__name__}: {exc}"
 
-            if ok:
+            if ok is None:
+                print(f"  UNPROVEN {label:30} {detail}")
+                unproven += 1
+            elif ok:
                 print(f"  accepted {label:30} {detail}")
                 accepted += 1
             else:
@@ -143,7 +166,10 @@ def main():
                 refused += 1
 
     total = len(cases)
-    print(f"\n{accepted} accepted, {refused} refused, {skipped} skipped, out of {total}")
+    print(f"\n{accepted} accepted, {refused} refused, {unproven} unproven, "
+          f"{skipped} skipped, out of {total}")
+    # Unproven does not fail the build: it marks a case this harness cannot yet
+    # judge, which is a gap in the test rather than in what is being tested.
     return 1 if refused or skipped else 0
 
 

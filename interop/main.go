@@ -243,10 +243,14 @@ func emitCredentials(ia, ib keri.Signer) {
 
 	// The issuer anchors the registry in its own log.
 	anchorReg := anchorSeal(ia, issuer, issuerEv.SAID, 1, regSAID, regSAID, "0")
+	regAnchored, err := keri.AnchoredEvent(registry,
+		keri.SourceSeal{SN: 1, SAID: anchorReg.eventSAID})
+	must(err)
 	cases = append(cases, kase{
 		Label: "vcp/registry-inception", Kind: "tel",
-		Why:   "a credential registry, anchored in the issuer's key log",
-		Event: b64(registry), Msg: b64(anchorReg.Message), Issuer: issuer,
+		Why: "a credential registry, carrying the source seal that names the " +
+			"event in the issuer's log anchoring it",
+		Event: b64(regAnchored), Msg: b64(anchorReg.Message), Issuer: issuer,
 	})
 
 	schema := "EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao"
@@ -271,11 +275,14 @@ func emitCredentials(ia, ib keri.Signer) {
 	must(err)
 	issSAID := saidOfEvent(iss)
 	anchorIss := anchorSeal(ia, issuer, anchorReg.eventSAID, 2, credSAID, issSAID, "0")
+	issAnchored, err := keri.AnchoredEvent(iss,
+		keri.SourceSeal{SN: 2, SAID: anchorIss.eventSAID})
+	must(err)
 	cases = append(cases, kase{
 		Label: "iss/credential-issued", Kind: "tel",
 		Why: "the issuance, anchored in the issuer's log — this is what makes the " +
 			"credential live rather than merely well formed",
-		Event: b64(iss), Msg: b64(anchorIss.Message), Issuer: issuer,
+		Event: b64(issAnchored), Msg: b64(anchorIss.Message), Issuer: issuer,
 	})
 
 	rev, err := keri.BuildRevocation(keri.RevocationInput{
@@ -284,11 +291,14 @@ func emitCredentials(ia, ib keri.Signer) {
 	})
 	must(err)
 	anchorRev := anchorSeal(ia, issuer, anchorIss.eventSAID, 3, credSAID, saidOfEvent(rev), "1")
+	revAnchored, err := keri.AnchoredEvent(rev,
+		keri.SourceSeal{SN: 3, SAID: anchorRev.eventSAID})
+	must(err)
 	cases = append(cases, kase{
 		Label: "rev/credential-revoked", Kind: "tel",
 		Why: "the revocation; a verifier that cannot see this treats a revoked " +
 			"credential as valid",
-		Event: b64(rev), Msg: b64(anchorRev.Message), Issuer: issuer,
+		Event: b64(revAnchored), Msg: b64(anchorRev.Message), Issuer: issuer,
 	})
 }
 
