@@ -43,6 +43,11 @@ type ReceiptInput struct {
 	Prefix    string `json:"prefix"`
 	SN        int    `json:"sn"`
 	EventSAID string `json:"event_said"`
+
+	// Version is which CESR version to build. The zero value means
+	// DefaultVersion. Carried here rather than assumed, because the attachment
+	// layer is where the two versions differ most.
+	Version Version `json:"version"`
 }
 
 // rctWire is a receipt event in the order KERI serialises it.
@@ -55,6 +60,11 @@ type rctWire struct {
 	D string `json:"d"`
 	I string `json:"i"`
 	S string `json:"s"`
+
+	// ver is the CESR version this receipt is built under. Unexported, so never
+	// serialised; it exists so the placeholder written on the first pass is the
+	// same width as the version string written on the second.
+	ver Version
 }
 
 // BuildReceipt returns the canonical bytes of a receipt event.
@@ -74,19 +84,24 @@ func BuildReceipt(in ReceiptInput) ([]byte, error) {
 			saidPlaceholderLen, len(in.EventSAID))
 	}
 
-	w := rctWire{
-		T: "rct",
-		D: in.EventSAID,
-		I: in.Prefix,
-		S: sequenceNumber(in.SN),
+	ver, err := resolveVersion(in.Version)
+	if err != nil {
+		return nil, err
 	}
-	return serialize(w)
+	w := rctWire{
+		ver: ver,
+		T:   "rct",
+		D:   in.EventSAID,
+		I:   in.Prefix,
+		S:   sequenceNumber(in.SN),
+	}
+	return serialize(w, ProtocolKERI, ver)
 }
 
 func (w rctWire) MarshalJSON() ([]byte, error) {
 	type wire rctWire
 	if w.V == "" {
-		w.V = versionString(0)
+		w.V = placeholderVersionString(ProtocolKERI, w.versionOrDefault())
 	}
 	return json.Marshal(wire(w))
 }
@@ -392,4 +407,13 @@ func AnswerStream(c Case) ([]byte, error) {
 		return nil, fmt.Errorf("a stream case must carry the event it attaches to")
 	}
 	return BuildStream(in)
+}
+
+// versionOrDefault is the version this receipt is built under, falling back to
+// the package default when the caller did not set one.
+func (w rctWire) versionOrDefault() Version {
+	if w.ver == (Version{}) {
+		return DefaultVersion
+	}
+	return w.ver
 }
