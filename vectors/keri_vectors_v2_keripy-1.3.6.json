@@ -1,0 +1,510 @@
+{
+ "vector_version": 2,
+ "oracle": "keripy 1.3.6",
+ "oracle_default_version": "1.0",
+ "oracle_default_kind": "JSON",
+ "what_this_is": "Paired CESR 1.0 and 2.0 expectations built from identical inputs. Captured from keripy, never typed by hand. The bytes are the specification: if an implementation disagrees, the implementation is wrong, and a vector is never edited to make a test pass.",
+ "how_to_use": "For each case, build the input under each version and compare against expect['1.0']['raw_b64'] and expect['2.0']['raw_b64'] byte for byte. Then check identifier_survives_version_change matches what you compute.",
+ "cases": [
+  {
+   "id": "icp/single-key/no-witnesses",
+   "kind": "inception",
+   "why": "A single-key identity uses basic derivation: the identifier IS the key, so it is not a digest of the event and does not move when the version changes. Every event's own identifier still moves, because that is a digest.",
+   "input": {
+    "keys": [
+     "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+    ],
+    "next_digests": [
+     "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+    ],
+    "derivation": "basic"
+   },
+   "expect": {
+    "1.0": {
+     "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDEyYl8iLCJ0IjoiaWNwIiwiZCI6IkVOQTk5d0lMek1UZWhQVHZjcGVNbHJkLTZOd2tBZmw4TFZSRzZYNkh5Qk9TIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIwIiwiYiI6W10sImMiOltdLCJhIjpbXX0=",
+     "said": "ENA99wILzMTehPTvcpeMlrd-6NwkAfl8LVRG6X6HyBOS",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERI10JSON00012b_",
+     "size": 299,
+     "event_readable": {
+      "v": "KERI10JSON00012b_",
+      "t": "icp",
+      "d": "ENA99wILzMTehPTvcpeMlrd-6NwkAfl8LVRG6X6HyBOS",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "0",
+      "kt": "1",
+      "k": [
+       "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+      ],
+      "nt": "1",
+      "n": [
+       "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+      ],
+      "bt": "0",
+      "b": [],
+      "c": [],
+      "a": []
+     }
+    },
+    "2.0": {
+     "raw_b64": "eyJ2IjoiS0VSSUNBQUpTT05BQUVxLiIsInQiOiJpY3AiLCJkIjoiRUxFcHhjN2w1ZXFKaGlsOXlTTzFXRE9wZEs2eW5BenBBM3gtQjkxOThsR0giLCJpIjoiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiLCJzIjoiMCIsImt0IjoiMSIsImsiOlsiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiXSwibnQiOiIxIiwibiI6WyJFRVhla1VZd3lmNEJsdjFVX1dGTUw3WWxpQlI5R0pYZmwzb3NLdElldktRTiJdLCJidCI6IjAiLCJiIjpbXSwiYyI6W10sImEiOltdfQ==",
+     "said": "ELEpxc7l5eqJhil9ySO1WDOpdK6ynAzpA3x-B9198lGH",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERICAAJSONAAEq.",
+     "size": 298,
+     "event_readable": {
+      "v": "KERICAAJSONAAEq.",
+      "t": "icp",
+      "d": "ELEpxc7l5eqJhil9ySO1WDOpdK6ynAzpA3x-B9198lGH",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "0",
+      "kt": "1",
+      "k": [
+       "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+      ],
+      "nt": "1",
+      "n": [
+       "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+      ],
+      "bt": "0",
+      "b": [],
+      "c": [],
+      "a": []
+     }
+    }
+   },
+   "identifier_survives_version_change": true
+  },
+  {
+   "id": "icp/two-keys/self-addressing",
+   "kind": "inception",
+   "why": "The case that decides migration. Two keys means self-addressing derivation: the identifier is a digest of the inception event, the version string is inside that event, so the SAME KEYS YIELD A DIFFERENT IDENTITY under 2.0. This is not a defect to be fixed; it is what the two encodings mean.",
+   "input": {
+    "keys": [
+     "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "DC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m"
+    ],
+    "isith": "2",
+    "next_digests": [
+     "EKoe-PQlxxoXwxHMG7OtB-XrkdoN0X9_L4o-vQDpDK-P",
+     "ENIx4mdi9DMO6kaLCwBayswJ_Lcqab-3DdIRmRrkzouM"
+    ],
+    "nsith": "2",
+    "derivation": "self-addressing"
+   },
+   "expect": {
+    "1.0": {
+     "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OV8iLCJ0IjoiaWNwIiwiZCI6IkVKYVBwcnpDR1Bfc3V4ek1xeTFhS2pmandZMXFFSDhGTlI5czRKeERhdm9RIiwiaSI6IkVKYVBwcnpDR1Bfc3V4ek1xeTFhS2pmandZMXFFSDhGTlI5czRKeERhdm9RIiwicyI6IjAiLCJrdCI6IjIiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwiREMzd1FTWHdBVnI3Ujg2Rk91LUhjZ2xQLVVtTUZNc2JuaEtYUENrbjJnLW0iXSwibnQiOiIyIiwibiI6WyJFS29lLVBRbHh4b1h3eEhNRzdPdEItWHJrZG9OMFg5X0w0by12UURwREstUCIsIkVOSXg0bWRpOURNTzZrYUxDd0JheXN3Sl9MY3FhYi0zRGRJUm1Scmt6b3VNIl0sImJ0IjoiMCIsImIiOltdLCJjIjpbXSwiYSI6W119",
+     "said": "EJaPprzCGP_suxzMqy1aKjfjwY1qEH8FNR9s4JxDavoQ",
+     "aid": "EJaPprzCGP_suxzMqy1aKjfjwY1qEH8FNR9s4JxDavoQ",
+     "version_string": "KERI10JSON000189_",
+     "size": 393,
+     "event_readable": {
+      "v": "KERI10JSON000189_",
+      "t": "icp",
+      "d": "EJaPprzCGP_suxzMqy1aKjfjwY1qEH8FNR9s4JxDavoQ",
+      "i": "EJaPprzCGP_suxzMqy1aKjfjwY1qEH8FNR9s4JxDavoQ",
+      "s": "0",
+      "kt": "2",
+      "k": [
+       "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+       "DC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m"
+      ],
+      "nt": "2",
+      "n": [
+       "EKoe-PQlxxoXwxHMG7OtB-XrkdoN0X9_L4o-vQDpDK-P",
+       "ENIx4mdi9DMO6kaLCwBayswJ_Lcqab-3DdIRmRrkzouM"
+      ],
+      "bt": "0",
+      "b": [],
+      "c": [],
+      "a": []
+     }
+    },
+    "2.0": {
+     "raw_b64": "eyJ2IjoiS0VSSUNBQUpTT05BQUdJLiIsInQiOiJpY3AiLCJkIjoiRU13SC11amp5ajdWVFJRZzk5dlFuc0xrWHIyRXp0QVk4THVnZ1Q3ZWIzNzgiLCJpIjoiRU13SC11amp5ajdWVFJRZzk5dlFuc0xrWHIyRXp0QVk4THVnZ1Q3ZWIzNzgiLCJzIjoiMCIsImt0IjoiMiIsImsiOlsiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiLCJEQzN3UVNYd0FWcjdSODZGT3UtSGNnbFAtVW1NRk1zYm5oS1hQQ2tuMmctbSJdLCJudCI6IjIiLCJuIjpbIkVLb2UtUFFseHhvWHd4SE1HN090Qi1Ycmtkb04wWDlfTDRvLXZRRHBESy1QIiwiRU5JeDRtZGk5RE1PNmthTEN3QmF5c3dKX0xjcWFiLTNEZElSbVJya3pvdU0iXSwiYnQiOiIwIiwiYiI6W10sImMiOltdLCJhIjpbXX0=",
+     "said": "EMwH-ujjyj7VTRQg99vQnsLkXr2EztAY8LuggT7eb378",
+     "aid": "EMwH-ujjyj7VTRQg99vQnsLkXr2EztAY8LuggT7eb378",
+     "version_string": "KERICAAJSONAAGI.",
+     "size": 392,
+     "event_readable": {
+      "v": "KERICAAJSONAAGI.",
+      "t": "icp",
+      "d": "EMwH-ujjyj7VTRQg99vQnsLkXr2EztAY8LuggT7eb378",
+      "i": "EMwH-ujjyj7VTRQg99vQnsLkXr2EztAY8LuggT7eb378",
+      "s": "0",
+      "kt": "2",
+      "k": [
+       "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+       "DC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m"
+      ],
+      "nt": "2",
+      "n": [
+       "EKoe-PQlxxoXwxHMG7OtB-XrkdoN0X9_L4o-vQDpDK-P",
+       "ENIx4mdi9DMO6kaLCwBayswJ_Lcqab-3DdIRmRrkzouM"
+      ],
+      "bt": "0",
+      "b": [],
+      "c": [],
+      "a": []
+     }
+    }
+   },
+   "identifier_survives_version_change": false
+  },
+  {
+   "id": "icp/witnesses/derived-threshold",
+   "kind": "inception",
+   "why": "Three witnesses and no stated threshold. The reference derives it from the witness count under both versions; an implementation that defaults it to zero produces a valid-looking identity whose witnesses need not agree.",
+   "input": {
+    "keys": [
+     "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+    ],
+    "next_digests": [
+     "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+    ],
+    "witnesses": [
+     "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+     "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+     "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+    ],
+    "derivation": "basic"
+   },
+   "expect": {
+    "1.0": {
+     "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVQRHJDS1FGWTFxWkxtaWxhajh2WDQ1NXpFRkN6eHF1VUF4SGtabUQ0TkVzIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIzIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+     "said": "EPDrCKQFY1qZLmilaj8vX455zEFCzxquUAxHkZmD4NEs",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERI10JSON0001b7_",
+     "size": 439,
+     "event_readable": {
+      "v": "KERI10JSON0001b7_",
+      "t": "icp",
+      "d": "EPDrCKQFY1qZLmilaj8vX455zEFCzxquUAxHkZmD4NEs",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "0",
+      "kt": "1",
+      "k": [
+       "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+      ],
+      "nt": "1",
+      "n": [
+       "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+      ],
+      "bt": "3",
+      "b": [
+       "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+       "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+       "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+      ],
+      "c": [],
+      "a": []
+     }
+    },
+    "2.0": {
+     "raw_b64": "eyJ2IjoiS0VSSUNBQUpTT05BQUcyLiIsInQiOiJpY3AiLCJkIjoiRUdmUzVsQzdsenRlZkNIcDFYSEE4bWZmS2RFX0lhcTFVRDJTbkt2ZEo2VjMiLCJpIjoiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiLCJzIjoiMCIsImt0IjoiMSIsImsiOlsiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiXSwibnQiOiIxIiwibiI6WyJFRVhla1VZd3lmNEJsdjFVX1dGTUw3WWxpQlI5R0pYZmwzb3NLdElldktRTiJdLCJidCI6IjMiLCJiIjpbIkJNaFRyUThNMHJZWnJxa3M3c1Q5VnFKTlpKblZoTTU1Slg1Rno5Z1RtMkNuIiwiQk80eC1EeUlweElacHZ6NXZ1RGFtOEltSUZpUFdoV21GRlZUVUUzNVpKNWMiLCJCRWRGMFp4bTdKRjUtaVVKY0ZaQW52RnBaN2FocDB2OWozcjlVbzlaWXdZViJdLCJjIjpbXSwiYSI6W119",
+     "said": "EGfS5lC7lztefCHp1XHA8mffKdE_Iaq1UD2SnKvdJ6V3",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERICAAJSONAAG2.",
+     "size": 438,
+     "event_readable": {
+      "v": "KERICAAJSONAAG2.",
+      "t": "icp",
+      "d": "EGfS5lC7lztefCHp1XHA8mffKdE_Iaq1UD2SnKvdJ6V3",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "0",
+      "kt": "1",
+      "k": [
+       "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+      ],
+      "nt": "1",
+      "n": [
+       "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+      ],
+      "bt": "3",
+      "b": [
+       "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+       "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+       "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+      ],
+      "c": [],
+      "a": []
+     }
+    }
+   },
+   "identifier_survives_version_change": true
+  },
+  {
+   "id": "icp/witnesses/explicit-threshold",
+   "kind": "inception",
+   "why": "An explicitly stated witness threshold, to pin that a stated value is kept rather than re-derived, and that it is written in hexadecimal in both versions.",
+   "input": {
+    "keys": [
+     "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+    ],
+    "next_digests": [
+     "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+    ],
+    "witnesses": [
+     "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+     "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+     "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+    ],
+    "toad": 2,
+    "derivation": "basic"
+   },
+   "expect": {
+    "1.0": {
+     "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+     "said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERI10JSON0001b7_",
+     "size": 439,
+     "event_readable": {
+      "v": "KERI10JSON0001b7_",
+      "t": "icp",
+      "d": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "0",
+      "kt": "1",
+      "k": [
+       "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+      ],
+      "nt": "1",
+      "n": [
+       "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+      ],
+      "bt": "2",
+      "b": [
+       "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+       "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+       "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+      ],
+      "c": [],
+      "a": []
+     }
+    },
+    "2.0": {
+     "raw_b64": "eyJ2IjoiS0VSSUNBQUpTT05BQUcyLiIsInQiOiJpY3AiLCJkIjoiRUt5WGJtS3c2NmdyU0FaRkh0SjB3ZWpWZzNldS1zdW1WcXBzcGNxclc5SVIiLCJpIjoiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiLCJzIjoiMCIsImt0IjoiMSIsImsiOlsiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiXSwibnQiOiIxIiwibiI6WyJFRVhla1VZd3lmNEJsdjFVX1dGTUw3WWxpQlI5R0pYZmwzb3NLdElldktRTiJdLCJidCI6IjIiLCJiIjpbIkJNaFRyUThNMHJZWnJxa3M3c1Q5VnFKTlpKblZoTTU1Slg1Rno5Z1RtMkNuIiwiQk80eC1EeUlweElacHZ6NXZ1RGFtOEltSUZpUFdoV21GRlZUVUUzNVpKNWMiLCJCRWRGMFp4bTdKRjUtaVVKY0ZaQW52RnBaN2FocDB2OWozcjlVbzlaWXdZViJdLCJjIjpbXSwiYSI6W119",
+     "said": "EKyXbmKw66grSAZFHtJ0wejVg3eu-sumVqpspcqrW9IR",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERICAAJSONAAG2.",
+     "size": 438,
+     "event_readable": {
+      "v": "KERICAAJSONAAG2.",
+      "t": "icp",
+      "d": "EKyXbmKw66grSAZFHtJ0wejVg3eu-sumVqpspcqrW9IR",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "0",
+      "kt": "1",
+      "k": [
+       "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+      ],
+      "nt": "1",
+      "n": [
+       "EEXekUYwyf4Blv1U_WFML7YliBR9GJXfl3osKtIevKQN"
+      ],
+      "bt": "2",
+      "b": [
+       "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+       "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+       "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+      ],
+      "c": [],
+      "a": []
+     }
+    }
+   },
+   "identifier_survives_version_change": true
+  },
+  {
+   "id": "rot/single-key",
+   "kind": "rotation",
+   "why": "Rotating to the pre-committed next key. The prior event's identifier is part of the rotation, so a rotation is version-locked to the log it extends.",
+   "input": {
+    "keys": [
+     "<b>"
+    ],
+    "next_digests": [
+     "<dig c>"
+    ],
+    "sn": 1,
+    "chains_to": "its own icp"
+   },
+   "expect": {
+    "1.0": {
+     "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE2MF8iLCJ0Ijoicm90IiwiZCI6IkVLTjJSRUk1OVR4Rm1TVDRZUWhYa2VhRTBpZVFybGVKTERhMmEzY2xWZVZQIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjEiLCJwIjoiRU5BOTl3SUx6TVRlaFBUdmNwZU1scmQtNk53a0FmbDhMVlJHNlg2SHlCT1MiLCJrdCI6IjEiLCJrIjpbIkRDM3dRU1h3QVZyN1I4NkZPdS1IY2dsUC1VbU1GTXNibmhLWFBDa24yZy1tIl0sIm50IjoiMSIsIm4iOlsiRUtvZS1QUWx4eG9Yd3hITUc3T3RCLVhya2RvTjBYOV9MNG8tdlFEcERLLVAiXSwiYnQiOiIwIiwiYnIiOltdLCJiYSI6W10sImEiOltdfQ==",
+     "said": "EKN2REI59TxFmST4YQhXkeaE0ieQrleJLDa2a3clVeVP",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERI10JSON000160_",
+     "size": 352,
+     "event_readable": {
+      "v": "KERI10JSON000160_",
+      "t": "rot",
+      "d": "EKN2REI59TxFmST4YQhXkeaE0ieQrleJLDa2a3clVeVP",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "1",
+      "p": "ENA99wILzMTehPTvcpeMlrd-6NwkAfl8LVRG6X6HyBOS",
+      "kt": "1",
+      "k": [
+       "DC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m"
+      ],
+      "nt": "1",
+      "n": [
+       "EKoe-PQlxxoXwxHMG7OtB-XrkdoN0X9_L4o-vQDpDK-P"
+      ],
+      "bt": "0",
+      "br": [],
+      "ba": [],
+      "a": []
+     }
+    },
+    "2.0": {
+     "raw_b64": "eyJ2IjoiS0VSSUNBQUpTT05BQUZtLiIsInQiOiJyb3QiLCJkIjoiRUZTeVFnNGpxQjZPVmRlYUNjbHhHcHFmT2pKOWwwTFpDZHhQMW8yVHNIZ20iLCJpIjoiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiLCJzIjoiMSIsInAiOiJFTEVweGM3bDVlcUpoaWw5eVNPMVdET3BkSzZ5bkF6cEEzeC1COTE5OGxHSCIsImt0IjoiMSIsImsiOlsiREMzd1FTWHdBVnI3Ujg2Rk91LUhjZ2xQLVVtTUZNc2JuaEtYUENrbjJnLW0iXSwibnQiOiIxIiwibiI6WyJFS29lLVBRbHh4b1h3eEhNRzdPdEItWHJrZG9OMFg5X0w0by12UURwREstUCJdLCJidCI6IjAiLCJiciI6W10sImJhIjpbXSwiYyI6W10sImEiOltdfQ==",
+     "said": "EFSyQg4jqB6OVdeaCclxGpqfOjJ9l0LZCdxP1o2TsHgm",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERICAAJSONAAFm.",
+     "size": 358,
+     "event_readable": {
+      "v": "KERICAAJSONAAFm.",
+      "t": "rot",
+      "d": "EFSyQg4jqB6OVdeaCclxGpqfOjJ9l0LZCdxP1o2TsHgm",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "1",
+      "p": "ELEpxc7l5eqJhil9ySO1WDOpdK6ynAzpA3x-B9198lGH",
+      "kt": "1",
+      "k": [
+       "DC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m"
+      ],
+      "nt": "1",
+      "n": [
+       "EKoe-PQlxxoXwxHMG7OtB-XrkdoN0X9_L4o-vQDpDK-P"
+      ],
+      "bt": "0",
+      "br": [],
+      "ba": [],
+      "c": [],
+      "a": []
+     }
+    }
+   },
+   "identifier_survives_version_change": true
+  },
+  {
+   "id": "ixn/no-seals",
+   "kind": "interaction",
+   "why": "An interaction anchors data without changing keys. The version must be stated explicitly: an interaction that inherits the oracle's default silently becomes a 2.0 event when built against a 2.0-default build, which is how this generator produced a wrong vector on its first run.",
+   "input": {
+    "sn": 1,
+    "data": [],
+    "chains_to": "its own icp"
+   },
+   "expect": {
+    "1.0": {
+     "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDBjYl8iLCJ0IjoiaXhuIiwiZCI6IkVKeDVQQUVFRjdpdkJVV2hHNVBvMUloUXlOZzFVbm9EcGg3VTlLQ0lSZkt3IiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjEiLCJwIjoiRU5BOTl3SUx6TVRlaFBUdmNwZU1scmQtNk53a0FmbDhMVlJHNlg2SHlCT1MiLCJhIjpbXX0=",
+     "said": "EJx5PAEEF7ivBUWhG5Po1IhQyNg1UnoDph7U9KCIRfKw",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERI10JSON0000cb_",
+     "size": 203,
+     "event_readable": {
+      "v": "KERI10JSON0000cb_",
+      "t": "ixn",
+      "d": "EJx5PAEEF7ivBUWhG5Po1IhQyNg1UnoDph7U9KCIRfKw",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "1",
+      "p": "ENA99wILzMTehPTvcpeMlrd-6NwkAfl8LVRG6X6HyBOS",
+      "a": []
+     }
+    },
+    "2.0": {
+     "raw_b64": "eyJ2IjoiS0VSSUNBQUpTT05BQURLLiIsInQiOiJpeG4iLCJkIjoiRUxpNWtwYzR2WFE4d3hNSDgzRnFsTlJjX1VxbGJSNnZJbGc1M2sxSUxsSk4iLCJpIjoiREs4R28tTXBGeFRrODFiQm5Kc1Z6UmxSN0c1bVlxcDN2Z2RVZnlpVGd6UWQiLCJzIjoiMSIsInAiOiJFTEVweGM3bDVlcUpoaWw5eVNPMVdET3BkSzZ5bkF6cEEzeC1COTE5OGxHSCIsImEiOltdfQ==",
+     "said": "ELi5kpc4vXQ8wxMH83FqlNRc_UqlbR6vIlg53k1ILlJN",
+     "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+     "version_string": "KERICAAJSONAADK.",
+     "size": 202,
+     "event_readable": {
+      "v": "KERICAAJSONAADK.",
+      "t": "ixn",
+      "d": "ELi5kpc4vXQ8wxMH83FqlNRc_UqlbR6vIlg53k1ILlJN",
+      "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+      "s": "1",
+      "p": "ELEpxc7l5eqJhil9ySO1WDOpdK6ynAzpA3x-B9198lGH",
+      "a": []
+     }
+    }
+   },
+   "identifier_survives_version_change": true
+  },
+  {
+   "id": "dip/single-key",
+   "kind": "delegation",
+   "why": "A delegated inception is ALWAYS self-addressing, even with one key, because it must commit to its delegator. So unlike a plain single-key inception, a dip's identifier does move between versions.",
+   "input": {
+    "keys": [
+     "<c>"
+    ],
+    "next_digests": [
+     "<dig d>"
+    ],
+    "delegator": "<icp a>"
+   },
+   "expect": {
+    "1.0": {
+     "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE1Zl8iLCJ0IjoiZGlwIiwiZCI6IkVCb1EtLTdFMmJVOXM4QVRuS18xRkpMZkRhd3NQdnJqcWhmR2x0Y2FFTDhkIiwiaSI6IkVCb1EtLTdFMmJVOXM4QVRuS18xRkpMZkRhd3NQdnJqcWhmR2x0Y2FFTDhkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLZjIzNi1QT0xpYnFNNWttMWxQa2VUUUg5eFgtY2xKUGZRN1hsQ3BtSE5uIl0sIm50IjoiMSIsIm4iOlsiRU5JeDRtZGk5RE1PNmthTEN3QmF5c3dKX0xjcWFiLTNEZElSbVJya3pvdU0iXSwiYnQiOiIwIiwiYiI6W10sImMiOltdLCJhIjpbXSwiZGkiOiJESzhHby1NcEZ4VGs4MWJCbkpzVnpSbFI3RzVtWXFwM3ZnZFVmeWlUZ3pRZCJ9",
+     "said": "EBoQ--7E2bU9s8ATnK_1FJLfDawsPvrjqhfGltcaEL8d",
+     "aid": "EBoQ--7E2bU9s8ATnK_1FJLfDawsPvrjqhfGltcaEL8d",
+     "version_string": "KERI10JSON00015f_",
+     "size": 351,
+     "event_readable": {
+      "v": "KERI10JSON00015f_",
+      "t": "dip",
+      "d": "EBoQ--7E2bU9s8ATnK_1FJLfDawsPvrjqhfGltcaEL8d",
+      "i": "EBoQ--7E2bU9s8ATnK_1FJLfDawsPvrjqhfGltcaEL8d",
+      "s": "0",
+      "kt": "1",
+      "k": [
+       "DKf236-POLibqM5km1lPkeTQH9xX-clJPfQ7XlCpmHNn"
+      ],
+      "nt": "1",
+      "n": [
+       "ENIx4mdi9DMO6kaLCwBayswJ_Lcqab-3DdIRmRrkzouM"
+      ],
+      "bt": "0",
+      "b": [],
+      "c": [],
+      "a": [],
+      "di": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+     }
+    },
+    "2.0": {
+     "raw_b64": "eyJ2IjoiS0VSSUNBQUpTT05BQUZlLiIsInQiOiJkaXAiLCJkIjoiRU5nV0lRbkpESnFPeXVvNU1mTG5wTUpBbGpkbFpnZk92bFFPb3RXQmZteHUiLCJpIjoiRU5nV0lRbkpESnFPeXVvNU1mTG5wTUpBbGpkbFpnZk92bFFPb3RXQmZteHUiLCJzIjoiMCIsImt0IjoiMSIsImsiOlsiREtmMjM2LVBPTGlicU01a20xbFBrZVRRSDl4WC1jbEpQZlE3WGxDcG1ITm4iXSwibnQiOiIxIiwibiI6WyJFTkl4NG1kaTlETU82a2FMQ3dCYXlzd0pfTGNxYWItM0RkSVJtUnJrem91TSJdLCJidCI6IjAiLCJiIjpbXSwiYyI6W10sImEiOltdLCJkaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIn0=",
+     "said": "ENgWIQnJDJqOyuo5MfLnpMJAljdlZgfOvlQOotWBfmxu",
+     "aid": "ENgWIQnJDJqOyuo5MfLnpMJAljdlZgfOvlQOotWBfmxu",
+     "version_string": "KERICAAJSONAAFe.",
+     "size": 350,
+     "event_readable": {
+      "v": "KERICAAJSONAAFe.",
+      "t": "dip",
+      "d": "ENgWIQnJDJqOyuo5MfLnpMJAljdlZgfOvlQOotWBfmxu",
+      "i": "ENgWIQnJDJqOyuo5MfLnpMJAljdlZgfOvlQOotWBfmxu",
+      "s": "0",
+      "kt": "1",
+      "k": [
+       "DKf236-POLibqM5km1lPkeTQH9xX-clJPfQ7XlCpmHNn"
+      ],
+      "nt": "1",
+      "n": [
+       "ENIx4mdi9DMO6kaLCwBayswJ_Lcqab-3DdIRmRrkzouM"
+      ],
+      "bt": "0",
+      "b": [],
+      "c": [],
+      "a": [],
+      "di": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+     }
+    }
+   },
+   "identifier_survives_version_change": false
+  }
+ ]
+}

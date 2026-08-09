@@ -75,6 +75,10 @@ type DelegationInput struct {
 	// and Go marshals a map alphabetically, so any trip through one silently
 	// reorders it and changes the identifier.
 	Data []json.RawMessage `json:"data"`
+	// Version is which CESR version to build. The zero value means
+	// DefaultVersion. It is carried on the input rather than set globally so
+	// that an agent can answer a 1.0 peer and a 2.0 peer concurrently.
+	Version Version `json:"version"`
 }
 
 // dipWire is a delegated inception in the order KERI serialises it.
@@ -110,6 +114,13 @@ type dipWire struct {
 	// the identifier digests, the delegator cannot be swapped afterwards
 	// without producing a different identity.
 	DI string `json:"di"`
+	// ver is the CESR version this event is being built under. Unexported, so
+	// it is never serialised; it exists so the placeholder written on the first
+	// pass is the same WIDTH as the version string written on the second. The
+	// two encodings differ in width (17 characters against 16), and a
+	// placeholder of the wrong width makes the declared size wrong by exactly
+	// that difference.
+	ver Version
 }
 
 // MarshalJSON writes the version placeholder at its final width, so the two
@@ -117,7 +128,7 @@ type dipWire struct {
 func (w dipWire) MarshalJSON() ([]byte, error) {
 	type wire dipWire // avoid recursing into this method
 	if w.V == "" {
-		w.V = versionString(0)
+		w.V = placeholderVersionString(ProtocolKERI, w.versionOrDefault())
 	}
 	return json.Marshal(wire(w))
 }
@@ -186,6 +197,10 @@ func BuildDelegation(in DelegationInput) ([]byte, error) {
 // well formed, verify against the event locally, and are rejected by every peer
 // and by the delegator's own anchor.
 func BuildDelegatedInception(in DelegationInput) ([]byte, error) {
+	ver, err := resolveVersion(in.Version)
+	if err != nil {
+		return nil, err
+	}
 	if in.Delegator == "" {
 		return nil, fmt.Errorf("a delegated inception must name its delegator; " +
 			"without one it is an ordinary inception claiming an authority nobody granted")
@@ -231,7 +246,8 @@ func BuildDelegatedInception(in DelegationInput) ([]byte, error) {
 
 	blank := strings.Repeat("#", saidPlaceholderLen)
 	w := dipWire{
-		T: "dip",
+		ver: ver,
+		T:   "dip",
 		// Both blanked, at exactly the final width, before the single digest is
 		// taken. Not one then the other: a second digest taken once `i` is known
 		// would cover different bytes and come out different, leaving an event
@@ -253,7 +269,7 @@ func BuildDelegatedInception(in DelegationInput) ([]byte, error) {
 		DI: in.Delegator,
 	}
 
-	raw, err := serialize(w)
+	raw, err := serialize(w, ProtocolKERI, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +282,7 @@ func BuildDelegatedInception(in DelegationInput) ([]byte, error) {
 			"so the event's declared size is now wrong", len(prefix), saidPlaceholderLen)
 	}
 	w.I, w.D = prefix, prefix
-	return serialize(w)
+	return serialize(w, ProtocolKERI, ver)
 }
 
 // BuildDelegatedRotation returns the canonical bytes of a `drt`.
@@ -292,6 +308,10 @@ func BuildDelegatedInception(in DelegationInput) ([]byte, error) {
 // anchored. Emitting `rot` therefore produces an event that is well formed,
 // verifies against itself, and is accepted by nobody.
 func BuildDelegatedRotation(in DelegationInput) ([]byte, error) {
+	ver, err := resolveVersion(in.Version)
+	if err != nil {
+		return nil, err
+	}
 	if in.Prefix == "" {
 		return nil, fmt.Errorf("a delegated rotation must name the identity it belongs to")
 	}
@@ -353,7 +373,7 @@ func BuildDelegatedRotation(in DelegationInput) ([]byte, error) {
 	// carried, not recomputed — recomputing it here would produce a digest of
 	// this event rather than of the founding one, which is a different identity
 	// wearing the same key history.
-	dummy, err := serialize(w)
+	dummy, err := serialize(w, ProtocolKERI, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +387,7 @@ func BuildDelegatedRotation(in DelegationInput) ([]byte, error) {
 	}
 
 	w.D = said
-	return serialize(w)
+	return serialize(w, ProtocolKERI, ver)
 }
 
 // inceptionToad resolves the witness threshold an inceptive event states.
@@ -391,4 +411,13 @@ func inceptionToad(toad *int, witnesses int) (int, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+// versionOrDefault is the version this event is built under, falling back to
+// the package default when the caller did not set one.
+func (w dipWire) versionOrDefault() Version {
+	if w.ver == (Version{}) {
+		return DefaultVersion
+	}
+	return w.ver
 }

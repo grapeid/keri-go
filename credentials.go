@@ -33,24 +33,7 @@ import (
 // KERI, even though they are all part of one credential's story. The version
 // string names the protocol, so getting this wrong changes the bytes and
 // therefore the identifier.
-const (
-	protoKERI = "KERI"
-	protoACDC = "ACDC"
-)
-
-// versionStringLen is the width of a version string: `KERI10JSON0000fb_`.
-//
-// Fixed, and the same for every protocol here, which is what allows the size to
-// be filled in after serialising without changing the length being declared.
-const versionStringLen = 17
-
-// versionStringOffset is where the version string starts in a serialised event.
-//
-// Always immediately after `{"v":"`, because the version field is first and
-// states the length of everything after it — a version string discovered
-// somewhere later in the bytes would be a value inside the event, not the
-// event's own, and patching it would corrupt the event.
-const versionStringOffset = 6
+const ()
 
 // leadingVersion matches an event's own version string, anchored at the start.
 //
@@ -60,27 +43,8 @@ const versionStringOffset = 6
 // value happened to read `KERI10JSON0000ff_` would be silently rewritten, and
 // the credential would then fail to verify for reasons nothing in the code
 // would explain.
-var leadingVersion = regexp.MustCompile(`^\{"v":"(KERI|ACDC)[0-9a-f]{2}JSON[0-9a-f]{6}_"`)
-
-// acdcVersionString is versionString's ACDC counterpart.
-//
-// Same shape, different protocol identifier. A credential serialised with the
-// KERI identifier is not an ACDC and no verifier will read it as one.
-func acdcVersionString(size int) string {
-	return fmt.Sprintf("ACDC10JSON%06x_", size)
-}
-
-// protoVersionString picks the right version string for a protocol.
-func protoVersionString(proto string, size int) (string, error) {
-	switch proto {
-	case protoKERI:
-		return versionString(size), nil
-	case protoACDC:
-		return acdcVersionString(size), nil
-	default:
-		return "", fmt.Errorf("no version string defined for the %q protocol", proto)
-	}
-}
+var leadingVersion = regexp.MustCompile(
+	`^\{"v":"(?:KERI|ACDC)(?:[0-9a-f]{2}JSON[0-9a-f]{6}_|[A-Za-z0-9_-]{3}JSON[A-Za-z0-9_-]{4}\.)"`)
 
 // serializeVersioned renders an event and fills in the size its leading version
 // string declares.
@@ -89,7 +53,7 @@ func protoVersionString(proto string, size int) (string, error) {
 // string states the length of the serialised event and is part of it. The
 // placeholder is written at the final width, so filling in the real size cannot
 // change the length it is declaring.
-func serializeVersioned(event interface{}, proto string) ([]byte, error) {
+func serializeVersioned(event interface{}, proto Protocol, v Version) ([]byte, error) {
 	raw, err := marshalCanonical(event)
 	if err != nil {
 		return nil, err
@@ -98,16 +62,16 @@ func serializeVersioned(event interface{}, proto string) ([]byte, error) {
 		return nil, fmt.Errorf("the event does not begin with a version string, " +
 			"so there is nowhere to declare its size")
 	}
-	vs, err := protoVersionString(proto, len(raw))
+	vs, err := VersionString(proto, v, len(raw))
 	if err != nil {
 		return nil, err
 	}
-	if len(vs) != versionStringLen {
+	if len(vs) != versionStringLen(v) {
 		return nil, fmt.Errorf("the version string is %d characters and the placeholder "+
-			"was %d, so the declared size is now wrong", len(vs), versionStringLen)
+			"was %d, so the declared size is now wrong", len(vs), versionStringLen(v))
 	}
 	out := append([]byte(nil), raw...)
-	copy(out[versionStringOffset:versionStringOffset+versionStringLen], vs)
+	copy(out[versionFieldOffset:versionFieldOffset+versionStringLen(v)], vs)
 	return out, nil
 }
 
@@ -316,7 +280,7 @@ func saidOf(raw []byte) (string, error) {
 // The object may or may not carry a version string. A schema does not; a
 // registry inception does, and its declared size has to be corrected for the
 // blanked form before hashing, which is what `proto` is for.
-func saidifyObject(o jsonObject, proto string, labels ...string) (string, error) {
+func saidifyObject(o jsonObject, proto Protocol, v Version, labels ...string) (string, error) {
 	dummied := make(jsonObject, len(o))
 	copy(dummied, o)
 	for _, label := range labels {
@@ -332,7 +296,7 @@ func saidifyObject(o jsonObject, proto string, labels ...string) (string, error)
 	if proto == "" {
 		raw, err = marshalCanonical(dummied)
 	} else {
-		raw, err = serializeVersioned(dummied, proto)
+		raw, err = serializeVersioned(dummied, proto, v)
 	}
 	if err != nil {
 		return "", err
@@ -368,7 +332,7 @@ func BuildSchema(in SchemaInput) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("the schema is not a readable JSON object: %w", err)
 	}
-	said, err := saidifyObject(schema, "", schemaIDLabel)
+	said, err := saidifyObject(schema, "", V1, schemaIDLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +402,7 @@ func BuildRegistryInception(in RegistryInput) ([]byte, error) {
 	}
 
 	w := vcpWire{
-		V:  versionString(0),
+		V:  placeholderVersionString(ProtocolKERI, V1),
 		T:  ilkRegistryInception,
 		D:  saidDummy(),
 		I:  saidDummy(),
@@ -449,7 +413,7 @@ func BuildRegistryInception(in RegistryInput) ([]byte, error) {
 		B:  backers,
 		N:  in.Nonce,
 	}
-	dummy, err := serializeVersioned(w, protoKERI)
+	dummy, err := serializeVersioned(w, ProtocolKERI, V1)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +423,7 @@ func BuildRegistryInception(in RegistryInput) ([]byte, error) {
 	}
 	w.D = said
 	w.I = said
-	return serializeVersioned(w, protoKERI)
+	return serializeVersioned(w, ProtocolKERI, V1)
 }
 
 // ---------------------------------------------------------------------------
@@ -545,7 +509,7 @@ func BuildCredential(in CredentialInput) ([]byte, error) {
 		return nil, err
 	}
 	// The inner digest, taken before anything else. See the note above.
-	attributeSAID, err := saidifyObject(attributes, "", saidLabel)
+	attributeSAID, err := saidifyObject(attributes, "", V1, saidLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +522,7 @@ func BuildCredential(in CredentialInput) ([]byte, error) {
 	}
 
 	w := acdcWire{
-		V: acdcVersionString(0),
+		V: placeholderVersionString(ProtocolACDC, V1),
 		D: saidDummy(),
 		I: in.Issuer,
 		S: in.SchemaSAID,
@@ -583,7 +547,7 @@ func BuildCredential(in CredentialInput) ([]byte, error) {
 
 	// The outer digest, over the credential with the finished attribute block
 	// already in place.
-	dummy, err := serializeVersioned(w, protoACDC)
+	dummy, err := serializeVersioned(w, ProtocolACDC, V1)
 	if err != nil {
 		return nil, err
 	}
@@ -592,7 +556,7 @@ func BuildCredential(in CredentialInput) ([]byte, error) {
 		return nil, err
 	}
 	w.D = said
-	return serializeVersioned(w, protoACDC)
+	return serializeVersioned(w, ProtocolACDC, V1)
 }
 
 // buildAttributes assembles a credential's attribute block.
@@ -729,7 +693,7 @@ func BuildIssuance(in IssuanceInput) ([]byte, error) {
 		return nil, fmt.Errorf("an issuance must say when it happened")
 	}
 	w := telWire{
-		V:  versionString(0),
+		V:  placeholderVersionString(ProtocolKERI, V1),
 		T:  ilkIssuance,
 		D:  saidDummy(),
 		I:  in.CredentialSAID,
@@ -760,7 +724,7 @@ func BuildRevocation(in RevocationInput) ([]byte, error) {
 		return nil, fmt.Errorf("a revocation must say when it happened")
 	}
 	w := telWire{
-		V:  versionString(0),
+		V:  placeholderVersionString(ProtocolKERI, V1),
 		T:  ilkRevocation,
 		D:  saidDummy(),
 		I:  in.CredentialSAID,
@@ -774,7 +738,7 @@ func BuildRevocation(in RevocationInput) ([]byte, error) {
 
 // saidifyTEL takes the digest of a transaction event and fills it in.
 func saidifyTEL(w telWire) ([]byte, error) {
-	dummy, err := serializeVersioned(w, protoKERI)
+	dummy, err := serializeVersioned(w, ProtocolKERI, V1)
 	if err != nil {
 		return nil, err
 	}
@@ -783,7 +747,7 @@ func saidifyTEL(w telWire) ([]byte, error) {
 		return nil, err
 	}
 	w.D = said
-	return serializeVersioned(w, protoKERI)
+	return serializeVersioned(w, ProtocolKERI, V1)
 }
 
 // ---------------------------------------------------------------------------
@@ -842,7 +806,8 @@ func VerifyCredential(raw []byte) (*Credential, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkCredentialVersion(raw, protoACDC); err != nil {
+	ver, err := checkCredentialVersion(raw, ProtocolACDC)
+	if err != nil {
 		return nil, err
 	}
 
@@ -854,12 +819,12 @@ func VerifyCredential(raw []byte) (*Credential, error) {
 	if err != nil {
 		return nil, fmt.Errorf("the attribute block is not canonical: %w", err)
 	}
-	attributeSAID, err := checkCredentialSAID(attributes, "", saidLabel)
+	attributeSAID, err := checkCredentialSAID(attributes, "", ver, saidLabel)
 	if err != nil {
 		return nil, fmt.Errorf("the attribute block does not match its own identifier: %w", err)
 	}
 
-	said, err := checkCredentialSAID(sad, protoACDC, saidLabel)
+	said, err := checkCredentialSAID(sad, ProtocolACDC, ver, saidLabel)
 	if err != nil {
 		return nil, fmt.Errorf("the credential does not match its own identifier: %w", err)
 	}
@@ -897,7 +862,7 @@ func VerifySchema(raw []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	said, err := checkCredentialSAID(sad, "", schemaIDLabel)
+	said, err := checkCredentialSAID(sad, "", V1, schemaIDLabel)
 	if err != nil {
 		return "", fmt.Errorf("the schema does not match its own identifier: %w", err)
 	}
@@ -931,7 +896,8 @@ func VerifyTELEvent(raw []byte) (*TELEvent, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkCredentialVersion(raw, protoKERI); err != nil {
+	ver, err := checkCredentialVersion(raw, ProtocolKERI)
+	if err != nil {
 		return nil, err
 	}
 	ilk, ok := sad.getString("t")
@@ -949,7 +915,7 @@ func VerifyTELEvent(raw []byte) (*TELEvent, error) {
 		return nil, fmt.Errorf("%q is not a transaction event this understands", ilk)
 	}
 
-	said, err := checkCredentialSAID(sad, protoKERI, labels...)
+	said, err := checkCredentialSAID(sad, ProtocolKERI, ver, labels...)
 	if err != nil {
 		return nil, fmt.Errorf("the %s event does not match its own identifier: %w", ilk, err)
 	}
@@ -1064,25 +1030,41 @@ func parseCanonical(raw []byte) (jsonObject, error) {
 // This is what makes a serialised event self-delimiting inside a stream. An
 // event whose declared size is wrong cuts the next one in half, so it is worth
 // catching here rather than three events later.
-func checkCredentialVersion(raw []byte, proto string) error {
+func checkCredentialVersion(raw []byte, proto Protocol) (Version, error) {
 	if !leadingVersion.Match(raw) {
-		return fmt.Errorf("the bytes do not begin with a version string, so they are not " +
-			"canonical serialisation")
+		return Version{}, fmt.Errorf("the bytes do not begin with a version string, so they " +
+			"are not canonical serialisation")
 	}
-	want, err := protoVersionString(proto, len(raw))
+	// Read the version out of the bytes rather than assuming one. This is the
+	// point at which a credential from a stranger declares which CESR version
+	// it is written in, and the reason no negotiation is needed to read it.
+	gotProto, ver, declared, err := ParseVersionString(
+		string(raw[versionFieldOffset : versionFieldOffset+versionStringLenOf(raw)]))
 	if err != nil {
-		return err
+		return Version{}, err
 	}
-	got := string(raw[versionStringOffset : versionStringOffset+versionStringLen])
-	if got != want {
-		return fmt.Errorf("the version string says %q but the bytes are %d long and %s",
-			got, len(raw), proto)
+	if gotProto != proto {
+		return Version{}, fmt.Errorf("these are %s bytes but %s was expected", gotProto, proto)
 	}
-	return nil
+	if declared != len(raw) {
+		return Version{}, fmt.Errorf("the version string declares %d bytes but there are %d",
+			declared, len(raw))
+	}
+	return ver, nil
+}
+
+// versionStringLenOf reports how wide the version string in these bytes is,
+// which is how the two encodings are told apart before either is parsed.
+func versionStringLenOf(raw []byte) int {
+	// The 1.0 form ends in `_` at 17 characters; the 2.0 form ends in `.` at 16.
+	if len(raw) >= versionFieldOffset+16 && raw[versionFieldOffset+15] == '.' {
+		return 16
+	}
+	return 17
 }
 
 // checkCredentialSAID recomputes an identifier and compares it with the one written.
-func checkCredentialSAID(sad jsonObject, proto string, labels ...string) (string, error) {
+func checkCredentialSAID(sad jsonObject, proto Protocol, v Version, labels ...string) (string, error) {
 	if len(labels) == 0 {
 		return "", fmt.Errorf("no identifier field was named, so nothing would be checked")
 	}
@@ -1093,7 +1075,7 @@ func checkCredentialSAID(sad jsonObject, proto string, labels ...string) (string
 	if len(said) != saidPlaceholderLen {
 		return "", fmt.Errorf("%q is not a %d-character identifier", said, saidPlaceholderLen)
 	}
-	computed, err := saidifyObject(sad, proto, labels...)
+	computed, err := saidifyObject(sad, proto, v, labels...)
 	if err != nil {
 		return "", err
 	}

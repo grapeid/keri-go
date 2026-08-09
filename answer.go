@@ -81,6 +81,10 @@ type InceptionInput struct {
 	// Go marshals a map alphabetically, so any trip through one silently
 	// reorders it and changes the identifier.
 	Data []json.RawMessage `json:"data"`
+	// Version is which CESR version to build. The zero value means
+	// DefaultVersion. It is carried on the input rather than set globally so
+	// that an agent can answer a 1.0 peer and a 2.0 peer concurrently.
+	Version Version `json:"version"`
 }
 
 // RotationInput is what changing an identity's keys is given.
@@ -104,6 +108,10 @@ type RotationInput struct {
 	Toad *int `json:"toad"`
 	// Seals stay as raw bytes, for the reason given above.
 	Data []json.RawMessage `json:"data"`
+	// Version is which CESR version to build. The zero value means
+	// DefaultVersion. It is carried on the input rather than set globally so
+	// that an agent can answer a 1.0 peer and a 2.0 peer concurrently.
+	Version Version `json:"version"`
 }
 
 // InteractionInput is what anchoring something into a key history is given.
@@ -115,6 +123,10 @@ type InteractionInput struct {
 	// trip through a Go map would sort it alphabetically and change the
 	// identifier.
 	Data []json.RawMessage `json:"data"`
+	// Version is which CESR version to build. The zero value means
+	// DefaultVersion. It is carried on the input rather than set globally so
+	// that an agent can answer a 1.0 peer and a 2.0 peer concurrently.
+	Version Version `json:"version"`
 }
 
 // BuildInception lives in inception.go, BuildRotation in rotation.go.

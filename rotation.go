@@ -56,6 +56,13 @@ type rotWire struct {
 	// the same reason the field order above matters: a seal's own field order
 	// is part of the event, and a map would sort it alphabetically.
 	A []json.RawMessage `json:"a"`
+	// ver is the CESR version this event is being built under. Unexported, so
+	// it is never serialised; it exists so the placeholder written on the first
+	// pass is the same WIDTH as the version string written on the second. The
+	// two encodings differ in width (17 characters against 16), and a
+	// placeholder of the wrong width makes the declared size wrong by exactly
+	// that difference.
+	ver Version
 }
 
 // MarshalJSON writes the version placeholder at its final width, so that the
@@ -63,7 +70,7 @@ type rotWire struct {
 func (w rotWire) MarshalJSON() ([]byte, error) {
 	type wire rotWire // avoid recursing into this method
 	if w.V == "" {
-		w.V = versionString(0)
+		w.V = placeholderVersionString(ProtocolKERI, w.versionOrDefault())
 	}
 	return json.Marshal(wire(w))
 }
@@ -79,6 +86,10 @@ func (w rotWire) MarshalJSON() ([]byte, error) {
 // belongs to validation, and its absence here is why a rotation that looks
 // perfectly well formed can still be rejected by a peer.
 func BuildRotation(in RotationInput) ([]byte, error) {
+	ver, err := resolveVersion(in.Version)
+	if err != nil {
+		return nil, err
+	}
 	if in.Prefix == "" {
 		return nil, fmt.Errorf("a rotation must name the identity it belongs to")
 	}
@@ -133,19 +144,20 @@ func BuildRotation(in RotationInput) ([]byte, error) {
 	}
 
 	w := rotWire{
-		T:  "rot",
-		D:  strings.Repeat("#", saidPlaceholderLen),
-		I:  in.Prefix,
-		S:  sequenceNumber(in.SN),
-		P:  in.PriorSAID,
-		KT: kt.value,
-		K:  keys,
-		NT: nt.value,
-		N:  nexts,
-		BT: sequenceNumber(toad),
-		BR: cuts,
-		BA: adds,
-		A:  seals,
+		ver: ver,
+		T:   "rot",
+		D:   strings.Repeat("#", saidPlaceholderLen),
+		I:   in.Prefix,
+		S:   sequenceNumber(in.SN),
+		P:   in.PriorSAID,
+		KT:  kt.value,
+		K:   keys,
+		NT:  nt.value,
+		N:   nexts,
+		BT:  sequenceNumber(toad),
+		BR:  cuts,
+		BA:  adds,
+		A:   seals,
 	}
 
 	// First pass: the event with its identifier blanked to placeholder
@@ -153,7 +165,7 @@ func BuildRotation(in RotationInput) ([]byte, error) {
 	// bytes — not over the event with the field missing, and not with a
 	// placeholder of some other width, either of which yields an identifier
 	// nothing else in the world agrees with.
-	dummy, err := serialize(w)
+	dummy, err := serialize(w, ProtocolKERI, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +179,7 @@ func BuildRotation(in RotationInput) ([]byte, error) {
 	}
 
 	w.D = said
-	return serialize(w)
+	return serialize(w, ProtocolKERI, ver)
 }
 
 // rotWitnesses resolves the witness delta and the witness threshold.
@@ -255,4 +267,13 @@ func rotSet(items []string) (map[string]bool, error) {
 		set[it] = true
 	}
 	return set, nil
+}
+
+// versionOrDefault is the version this event is built under, falling back to
+// the package default when the caller did not set one.
+func (w rotWire) versionOrDefault() Version {
+	if w.ver == (Version{}) {
+		return DefaultVersion
+	}
+	return w.ver
 }

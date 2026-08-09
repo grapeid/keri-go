@@ -3,7 +3,6 @@ package keri
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -40,6 +39,13 @@ type ixnWire struct {
 	// changes the identifier. That is not hypothetical: it is what this case
 	// caught the first time it ran.
 	A []json.RawMessage `json:"a"`
+	// ver is the CESR version this event is being built under. Unexported, so
+	// it is never serialised; it exists so the placeholder written on the first
+	// pass is the same WIDTH as the version string written on the second. The
+	// two encodings differ in width (17 characters against 16), and a
+	// placeholder of the wrong width makes the declared size wrong by exactly
+	// that difference.
+	ver Version
 }
 
 // saidPlaceholderLen is the width of a CESR Blake3-256 identifier.
@@ -49,19 +55,30 @@ type ixnWire struct {
 // version string has already declared it.
 const saidPlaceholderLen = 44
 
-var versionPattern = regexp.MustCompile(`KERI[0-9a-f]{2}JSON[0-9a-f]{6}_`)
-
 // versionFieldOffset is where an event's own version string begins: immediately
 // after the opening `{"v":"`, because it is always the first field.
 const versionFieldOffset = 6
 
-// versionString declares the serialisation and the event's total size.
-func versionString(size int) string {
-	return fmt.Sprintf("KERI10JSON%06x_", size)
+// placeholderVersionString is what the first serialisation pass writes: a
+// version string of the right shape and the right WIDTH, declaring a size of
+// zero. The second pass overwrites it with the real size, which cannot change
+// the length because the width already matches.
+func placeholderVersionString(proto Protocol, v Version) string {
+	vs, err := VersionString(proto, v, 0)
+	if err != nil {
+		// An unsupported version is caught by the Build functions before they
+		// get here; a placeholder of the wrong width would corrupt the event.
+		return strings.Repeat("#", versionStringLen(v))
+	}
+	return vs
 }
 
 // BuildInteraction returns the canonical bytes of an interaction event.
 func BuildInteraction(in InteractionInput) ([]byte, error) {
+	ver, err := resolveVersion(in.Version)
+	if err != nil {
+		return nil, err
+	}
 	if in.Prefix == "" {
 		return nil, fmt.Errorf("an interaction must name the identity it belongs to")
 	}
@@ -74,19 +91,20 @@ func BuildInteraction(in InteractionInput) ([]byte, error) {
 	}
 
 	w := ixnWire{
-		T: "ixn",
-		D: strings.Repeat("#", saidPlaceholderLen),
-		I: in.Prefix,
-		S: sequenceNumber(in.SN),
-		P: in.PriorSAID,
-		A: seals,
+		ver: ver,
+		T:   "ixn",
+		D:   strings.Repeat("#", saidPlaceholderLen),
+		I:   in.Prefix,
+		S:   sequenceNumber(in.SN),
+		P:   in.PriorSAID,
+		A:   seals,
 	}
 
 	// First pass: the event with its identifier blanked. The digest is taken
 	// over exactly these bytes — not over the event without the field, and not
 	// with a placeholder of a different width, either of which produces an
 	// answer nothing else in the world agrees with.
-	dummy, err := serialize(w)
+	dummy, err := serialize(w, ProtocolKERI, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +118,7 @@ func BuildInteraction(in InteractionInput) ([]byte, error) {
 	}
 
 	w.D = said
-	return serialize(w)
+	return serialize(w, ProtocolKERI, ver)
 }
 
 // sequenceNumber renders a sequence number the way KERI writes it: lowercase
@@ -118,7 +136,7 @@ func sequenceNumber(sn int) string {
 // serialised event and is itself part of it, so the size is not known until
 // after serialising. The placeholder is written at the exact final width, so
 // filling it in cannot change the length it is declaring.
-func serialize(event interface{}) ([]byte, error) {
+func serialize(event interface{}, proto Protocol, v Version) ([]byte, error) {
 	raw, err := json.Marshal(event)
 	if err != nil {
 		return nil, err
@@ -141,8 +159,12 @@ func serialize(event interface{}) ([]byte, error) {
 		return nil, fmt.Errorf("the version string is at offset %d, not %d, so this is "+
 			"not a KERI event", loc[0], versionFieldOffset)
 	}
+	vs, err := VersionString(proto, v, len(raw))
+	if err != nil {
+		return nil, err
+	}
 	patched := append(append([]byte{}, raw[:loc[0]]...),
-		append([]byte(versionString(len(raw))), raw[loc[1]:]...)...)
+		append([]byte(vs), raw[loc[1]:]...)...)
 	if len(patched) != len(raw) {
 		return nil, fmt.Errorf("declaring the size changed the length, from %d to %d",
 			len(raw), len(patched))
@@ -155,7 +177,16 @@ func serialize(event interface{}) ([]byte, error) {
 func (w ixnWire) MarshalJSON() ([]byte, error) {
 	type wire ixnWire // avoid recursing into this method
 	if w.V == "" {
-		w.V = versionString(0)
+		w.V = placeholderVersionString(ProtocolKERI, w.versionOrDefault())
 	}
 	return json.Marshal(wire(w))
+}
+
+// versionOrDefault is the version this event is built under, falling back to
+// the package default when the caller did not set one.
+func (w ixnWire) versionOrDefault() Version {
+	if w.ver == (Version{}) {
+		return DefaultVersion
+	}
+	return w.ver
 }

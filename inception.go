@@ -49,6 +49,13 @@ type icpWire struct {
 	// seal's field order is part of the event, and a Go map would sort it
 	// alphabetically and change the identifier.
 	A []json.RawMessage `json:"a"`
+	// ver is the CESR version this event is being built under. Unexported, so
+	// it is never serialised; it exists so the placeholder written on the first
+	// pass is the same WIDTH as the version string written on the second. The
+	// two encodings differ in width (17 characters against 16), and a
+	// placeholder of the wrong width makes the declared size wrong by exactly
+	// that difference.
+	ver Version
 }
 
 // MarshalJSON writes the version placeholder at its final width, so that the
@@ -56,7 +63,7 @@ type icpWire struct {
 func (w icpWire) MarshalJSON() ([]byte, error) {
 	type wire icpWire // avoid recursing into this method
 	if w.V == "" {
-		w.V = versionString(0)
+		w.V = placeholderVersionString(ProtocolKERI, w.versionOrDefault())
 	}
 	return json.Marshal(wire(w))
 }
@@ -80,6 +87,10 @@ func (w icpWire) MarshalJSON() ([]byte, error) {
 // that always digests breaks every single-key identity that already exists; one
 // that always uses the key cannot make a multi-key identity at all.
 func BuildInception(in InceptionInput) ([]byte, error) {
+	ver, err := resolveVersion(in.Version)
+	if err != nil {
+		return nil, err
+	}
 	if len(in.Keys) == 0 {
 		return nil, fmt.Errorf("an identity must be founded on at least one key")
 	}
@@ -107,14 +118,15 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 	}
 
 	w := icpWire{
-		T:  "icp",
-		S:  sequenceNumber(0), // an inception is always the first event
-		KT: kt,
-		K:  in.Keys,
-		NT: nt,
-		N:  emptyIfNil(in.NextDigests),
-		BT: hexCount(toad),
-		B:  emptyIfNil(in.Witnesses),
+		ver: ver,
+		T:   "icp",
+		S:   sequenceNumber(0), // an inception is always the first event
+		KT:  kt,
+		K:   in.Keys,
+		NT:  nt,
+		N:   emptyIfNil(in.NextDigests),
+		BT:  hexCount(toad),
+		B:   emptyIfNil(in.Witnesses),
 		// Configuration traits. Nothing this package builds sets any, but the
 		// field is not optional: an event missing "c" is a different length and
 		// therefore a different identity.
@@ -129,7 +141,7 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 		// not a blank, and "d" therefore differs from "i" on these events.
 		w.I = in.Keys[0]
 		w.D = blank
-		dummy, err := serialize(w)
+		dummy, err := serialize(w, ProtocolKERI, ver)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +165,7 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 		// out different, which would leave an event whose identifier is not its
 		// SAID and which every peer would reject.
 		w.I, w.D = blank, blank
-		raw, err := serialize(w)
+		raw, err := serialize(w, ProtocolKERI, ver)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +179,7 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 		}
 		w.I, w.D = prefix, prefix
 	}
-	return serialize(w)
+	return serialize(w, ProtocolKERI, ver)
 }
 
 // hexCount renders a count the way KERI writes every number in an event body:
@@ -424,4 +436,13 @@ func emptySealsIfNil(v []json.RawMessage) []json.RawMessage {
 		return []json.RawMessage{}
 	}
 	return v
+}
+
+// versionOrDefault is the version this event is built under, falling back to
+// the package default when the caller did not set one.
+func (w icpWire) versionOrDefault() Version {
+	if w.ver == (Version{}) {
+		return DefaultVersion
+	}
+	return w.ver
 }
