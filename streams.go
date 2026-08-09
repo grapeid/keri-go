@@ -300,11 +300,15 @@ var errAnsweredByAssert = fmt.Errorf("answered by assertion")
 
 // AnswerReceipt produces this implementation's answer to a receipt case.
 //
-// Attachment material — the cigars — may arrive on the input or, when the
-// vector file captured them under expect, on the case's expect object. Either
-// way they are treated as given material to frame, never as something this
-// function re-signs: producing a signature requires a private key this package
-// does not hold.
+// The cigars arrive on the input and are framed, never re-signed: producing a
+// signature requires a private key this package does not hold.
+//
+// They must come from the input and nowhere else. An earlier version read them
+// off the case's expect object, and where even that was absent, parsed them out
+// of the expected stream itself — which meant four cases rebuilt the answer from
+// the answer and could not fail on attachment content. The vectors were the real
+// defect there: they asked for a stream their input could not produce. The
+// generator now supplies the material, with every expected byte unchanged.
 func AnswerReceipt(c Case) ([]byte, error) {
 	var in struct {
 		Prefix           string          `json:"prefix"`
@@ -331,9 +335,6 @@ func AnswerReceipt(c Case) ([]byte, error) {
 	}
 
 	couples := in.Couples
-	if len(couples) == 0 {
-		couples = couplesFromExpect(c)
-	}
 	if len(couples) == 0 && in.CigarQB64 != "" {
 		w := in.Witness
 		if w == "" && len(in.SigningWitnesses) == 1 {
@@ -346,15 +347,6 @@ func AnswerReceipt(c Case) ([]byte, error) {
 			return nil, fmt.Errorf("a cigar is present but no witness identifier names who signed")
 		}
 		couples = []ReceiptCouple{{Witness: w, CigarQB64: in.CigarQB64}}
-	}
-	if len(couples) == 0 && len(in.SigningWitnesses) > 0 {
-		couples = couplesForWitnesses(c, in.SigningWitnesses)
-	}
-	if len(couples) == 0 && in.Witness != "" {
-		couples = couplesForWitnesses(c, []string{in.Witness})
-	}
-	if len(couples) == 0 && len(in.Witnesses) > 0 && c.Expect.RawB64 != "" {
-		couples = couplesForWitnesses(c, in.Witnesses)
 	}
 
 	prefix, said, sn := in.Prefix, in.EventSAID, in.SN
@@ -388,76 +380,6 @@ func AnswerReceipt(c Case) ([]byte, error) {
 		return BuildReceipt(body)
 	}
 	return BuildReceiptStream(body, couples)
-}
-
-// couplesFromExpect reads receipt couples captured on the case's expect object.
-func couplesFromExpect(c Case) []ReceiptCouple {
-	if len(c.ExpectRaw) == 0 {
-		return nil
-	}
-	var exp struct {
-		Couples   []ReceiptCouple `json:"couples"`
-		CigarQB64 string          `json:"cigar_qb64"`
-		Witness   string          `json:"witness"`
-	}
-	if err := json.Unmarshal(c.ExpectRaw, &exp); err != nil {
-		return nil
-	}
-	if len(exp.Couples) > 0 {
-		return exp.Couples
-	}
-	if exp.CigarQB64 != "" && exp.Witness != "" {
-		return []ReceiptCouple{{Witness: exp.Witness, CigarQB64: exp.CigarQB64}}
-	}
-	return nil
-}
-
-// couplesForWitnesses picks couples for the given witnesses, preserving the
-// caller's witness order, from material captured on the expect object or
-// parsed out of the expected stream.
-func couplesForWitnesses(c Case, witnesses []string) []ReceiptCouple {
-	all := couplesFromExpect(c)
-	if len(all) == 0 {
-		if c.Expect.RawB64 == "" {
-			return nil
-		}
-		raw, err := base64.StdEncoding.DecodeString(c.Expect.RawB64)
-		if err != nil {
-			return nil
-		}
-		_, attached, err := splitStream(raw)
-		if err != nil || len(attached) == 0 {
-			return nil
-		}
-		groups, err := parseAttachments(attached)
-		if err != nil {
-			return nil
-		}
-		for _, g := range groups {
-			if g.Counter != counterNonTransReceiptCouples {
-				continue
-			}
-			for _, couple := range g.Couples {
-				all = append(all, ReceiptCouple{Witness: couple.Signer, CigarQB64: couple.Sig})
-			}
-		}
-	}
-	if len(all) == 0 {
-		return nil
-	}
-	byWit := make(map[string]string, len(all))
-	for _, couple := range all {
-		byWit[couple.Witness] = couple.CigarQB64
-	}
-	out := make([]ReceiptCouple, 0, len(witnesses))
-	for _, w := range witnesses {
-		cig, ok := byWit[w]
-		if !ok {
-			return nil
-		}
-		out = append(out, ReceiptCouple{Witness: w, CigarQB64: cig})
-	}
-	return out
 }
 
 // AnswerStream produces this implementation's answer to a stream case.
