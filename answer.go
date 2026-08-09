@@ -96,13 +96,7 @@ type InteractionInput struct {
 	Data []json.RawMessage `json:"data"`
 }
 
-// BuildInception returns the canonical bytes of an inception event.
-//
-// The identifier is a digest of these bytes, so this function decides what an
-// identity IS. Everything else in KERI rests on it.
-func BuildInception(in InceptionInput) ([]byte, error) {
-	return nil, ErrNotImplemented
-}
+// BuildInception lives in inception.go.
 
 // BuildRotation returns the canonical bytes of a rotation event.
 //
