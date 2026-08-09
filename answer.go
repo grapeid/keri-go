@@ -81,6 +81,16 @@ type RotationInput struct {
 	NextDigests []string        `json:"next_digests"`
 	Isith       json.RawMessage `json:"isith"`
 	Nsith       json.RawMessage `json:"nsith"`
+	// A rotation states witnesses as a DELTA against the set the identity
+	// already has, so it needs that prior set to check the delta is applicable
+	// as well as the cuts and adds themselves.
+	PriorWitnesses []string `json:"prior_witnesses"`
+	Cuts           []string `json:"cuts"`
+	Adds           []string `json:"adds"`
+	// A pointer because absent and zero are different answers: absent means
+	// "derive the threshold", zero means "no witness need agree", and an int
+	// could not tell them apart.
+	Toad *int `json:"toad"`
 	// Seals stay as raw bytes, for the reason given above.
 	Data []json.RawMessage `json:"data"`
 }
@@ -101,14 +111,5 @@ type InteractionInput struct {
 // The identifier is a digest of these bytes, so this function decides what an
 // identity IS. Everything else in KERI rests on it.
 func BuildInception(in InceptionInput) ([]byte, error) {
-	return nil, ErrNotImplemented
-}
-
-// BuildRotation returns the canonical bytes of a rotation event.
-//
-// A rotation carries the key the previous event committed to and chains to that
-// event by digest. Both are checked by whoever reads the history, so both are
-// places this can differ from the reference without anything local noticing.
-func BuildRotation(in RotationInput) ([]byte, error) {
 	return nil, ErrNotImplemented
 }
