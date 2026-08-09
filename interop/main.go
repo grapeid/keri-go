@@ -100,6 +100,31 @@ func main() {
 	emit("rot/to-precommitted-key",
 		"rotating to the key the inception committed to by digest", rot, b)
 
+	// A full pre-rotation cycle driven by the keychain: it generates the keys in
+	// force and their committed successors, then the rotation reveals exactly
+	// what the inception committed to. keripy enforces that commitment, so this
+	// is the check that the custody logic is right and not merely self-consistent.
+	chain, err := keri.NewKeychain(keri.NewMemoryKeyStore(), "custody", 1)
+	must(err)
+	ck, err := chain.CurrentKeys()
+	must(err)
+	cn, err := chain.NextDigests()
+	must(err)
+	cIcp, err := keri.BuildInception(keri.InceptionInput{Keys: ck, NextDigests: cn})
+	must(err)
+	emit("icp/from-keychain", "an identity whose keys the keychain created", cIcp, chain.Signers()...)
+	cIcpEv, err := keri.ParseEvent(cIcp)
+	must(err)
+	rotKeys, rotNext, err := chain.Rotate()
+	must(err)
+	cRot, err := keri.BuildRotation(keri.RotationInput{
+		Prefix: cIcpEv.Identifier, Keys: rotKeys, PriorSAID: cIcpEv.SAID,
+		SN: 1, NextDigests: rotNext,
+	})
+	must(err)
+	emit("rot/from-keychain", "revealing exactly the key the inception committed to",
+		cRot, chain.Signers()...)
+
 	// A two-key identity, to exercise indexed signatures rather than only the
 	// single-signature case where every index is zero.
 	d, e := signerFor('d'), signerFor('e')
