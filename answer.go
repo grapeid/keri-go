@@ -37,8 +37,11 @@ func Answer(c Case) ([]byte, error) {
 		}
 		return BuildInteraction(in)
 	case "delegation":
-		// dip / drt — same seam as inception/rotation, not filled in yet.
-		return nil, ErrNotImplemented
+		var in DelegationInput
+		if err := json.Unmarshal(c.Input, &in); err != nil {
+			return nil, fmt.Errorf("case input is not a delegation: %w", err)
+		}
+		return BuildDelegation(in)
 	case "credential", "receipt", "stream":
 		// ACDC / TEL, witness receipts, and CESR streams — not filled in yet.
 		return nil, ErrNotImplemented
