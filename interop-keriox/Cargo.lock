@@ -666,8 +666,10 @@ dependencies = [
  "base64 0.22.1",
  "cesrox",
  "keri-core",
+ "said",
  "serde",
  "serde_json",
+ "teliox",
  "tempfile",
 ]
 
@@ -732,6 +734,7 @@ dependencies = [
  "said",
  "serde",
  "serde-hex",
+ "serde_cbor",
  "serde_derive",
  "serde_json",
  "sha2 0.9.9",
@@ -1370,6 +1373,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "teliox"
+version = "0.17.13"
+source = "git+https://github.com/THCLab/keriox?rev=ddcd2aba2de6199ec776ea5b1affdf5819dca410#ddcd2aba2de6199ec776ea5b1affdf5819dca410"
+dependencies = [
+ "arrayref",
+ "base64 0.13.1",
+ "cesrox",
+ "chrono",
+ "keri-core",
+ "redb",
+ "said",
+ "serde",
+ "serde-hex",
+ "serde_cbor",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

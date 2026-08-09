@@ -17,6 +17,8 @@ publish = false
 # commit somebody can check out, and a bump is a reviewable diff.
 [dependencies]
 keri-core = { git = "https://github.com/THCLab/keriox", rev = "ddcd2aba2de6199ec776ea5b1affdf5819dca410" }
+teliox = { git = "https://github.com/THCLab/keriox", rev = "ddcd2aba2de6199ec776ea5b1affdf5819dca410" }
+said = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"

@@ -20,6 +20,7 @@ use cesrox::parse;
 use keri_core::{
     database::redb::RedbDatabase,
     event_message::signed_event_message::{Message, Notice},
+    prefix::IdentifierPrefix,
     processor::{
         basic_processor::BasicProcessor,
         escrow::{default_escrow_bus, EscrowConfig},
@@ -27,7 +28,14 @@ use keri_core::{
         Processor,
     },
 };
+use said::SelfAddressingIdentifier;
 use serde::Deserialize;
+use std::str::FromStr;
+use teliox::{
+    database::{redb::RedbTelDatabase, EscrowDatabase as TelEscrowDb},
+    processor::storage::TelEventStorage,
+    tel::Tel,
+};
 use tempfile::NamedTempFile;
 
 #[derive(Deserialize)]
@@ -43,6 +51,8 @@ struct Case {
     extra_b64: Vec<String>,
     #[serde(default)]
     skipped: String,
+    #[serde(default)]
+    issuer: String,
 }
 
 fn decode(s: &str) -> Vec<u8> {
@@ -59,6 +69,17 @@ fn main() {
     let processor = BasicProcessor::new(Arc::clone(&events_db), Some(not_bus));
     let storage = EventStorage::new(Arc::clone(&events_db));
 
+    // The TEL needs the KEL beside it: a transaction event is only worth
+    // anything because the issuer's key log anchors it, so teliox is given the
+    // same key-event storage the processor above writes into.
+    let tel_db_path = NamedTempFile::new().unwrap();
+    let tel_db = Arc::new(RedbTelDatabase::new(tel_db_path.path()).unwrap());
+    let tel = Tel::new(
+        Arc::new(TelEventStorage::new(tel_db)),
+        Arc::new(EventStorage::new(Arc::clone(&events_db))),
+        None,
+    );
+
     let (mut accepted, mut refused, mut skipped) = (0, 0, 0);
 
     for case in &cases {
@@ -67,13 +88,38 @@ fn main() {
             skipped += 1;
             continue;
         }
-        // Only key events are judged here. keriox's transaction-event support
-        // lives behind a different surface, and claiming to have tested it by
-        // running it through the key-event processor would be worse than saying
-        // it is untested.
+        // Transaction events go to teliox, which is a different surface from the
+        // key-event processor. Running them through the wrong one to produce a
+        // green line would be worse than reporting them untested.
+        if case.kind == "tel" {
+            match judge_tel(&tel, &processor, case) {
+                Ok(detail) => {
+                    println!("  accepted {:30} {}", case.label, detail);
+                    accepted += 1;
+                }
+                Err(why) => {
+                    println!("  REFUSED  {:30} {}", case.label, why);
+                    refused += 1;
+                }
+            }
+            continue;
+        }
+        if case.kind == "credential" {
+            match judge_credential(case) {
+                Ok(detail) => {
+                    println!("  accepted {:30} {}", case.label, detail);
+                    accepted += 1;
+                }
+                Err(why) => {
+                    println!("  REFUSED  {:30} {}", case.label, why);
+                    refused += 1;
+                }
+            }
+            continue;
+        }
         if case.kind != "kel" && case.kind != "delegation" {
             println!(
-                "  SKIPPED  {:30} kind {:?} is not a key event",
+                "  SKIPPED  {:30} kind {:?} is unknown",
                 case.label, case.kind
             );
             skipped += 1;
@@ -162,4 +208,118 @@ fn main() {
     if refused > 0 {
         std::process::exit(1);
     }
+}
+
+/// Judge a transaction event with teliox.
+///
+/// The anchoring interaction goes into the key log first — a transaction event
+/// asserts that something happened, and the issuer's key log is what makes that
+/// assertion worth anything. Then the event itself, which carries the source
+/// seal naming that interaction.
+fn judge_tel<D, K>(
+    tel: &Tel<D, K>,
+    processor: &BasicProcessor<K>,
+    case: &Case,
+) -> Result<String, String>
+where
+    D: teliox::database::TelEventDatabase,
+    K: keri_core::database::EventDatabase + 'static,
+{
+    if !case.message_b64.is_empty() {
+        let raw = decode(&case.message_b64);
+        let parsed = parse(&raw)
+            .map_err(|e| format!("anchor is not CESR: {e:?}"))?
+            .1;
+        let msg = Message::try_from(parsed).map_err(|e| format!("anchor is not KERI: {e}"))?;
+        processor
+            .process(&msg)
+            .map_err(|e| format!("the anchoring event was refused: {e}"))?;
+    }
+
+    let raw = decode(&case.event_b64);
+    tel.parse_and_process_tel_stream(&raw)
+        .map_err(|e| format!("{e}"))?;
+
+    // Read the state back. A stream that parsed but established nothing is not
+    // an acceptance, and reporting it as one is the mistake this harness has
+    // already made once with key events.
+    let sad: serde_json::Value =
+        serde_json::from_slice(&raw[..find_json_end(&raw)]).map_err(|e| format!("{e}"))?;
+    let ilk = sad["t"].as_str().unwrap_or("");
+    let subject = sad["i"].as_str().unwrap_or("");
+
+    if ilk == "vcp" {
+        let id = IdentifierPrefix::from_str(subject).map_err(|e| format!("{e}"))?;
+        return match tel.get_management_tel_state(&id) {
+            Ok(Some(_)) => Ok(format!("registry live {subject}")),
+            Ok(None) => Err("the registry was not established".into()),
+            Err(e) => Err(format!("{e}")),
+        };
+    }
+
+    let vc = SelfAddressingIdentifier::from_str(subject).map_err(|e| format!("{e}"))?;
+    match tel.get_vc_state(&vc) {
+        Ok(Some(state)) => Ok(format!("credential state is {state:?}")),
+        Ok(None) => Err(format!("the credential has no state after a {ilk}")),
+        Err(e) => Err(format!("{e}")),
+    }
+}
+
+/// A credential is a document: its identifier must be a digest of its contents.
+fn judge_credential(case: &Case) -> Result<String, String> {
+    let raw = decode(&case.event_b64);
+    let sad: serde_json::Value = serde_json::from_slice(&raw).map_err(|e| format!("{e}"))?;
+    let said = sad["d"]
+        .as_str()
+        .ok_or("the credential has no identifier")?;
+    let parsed = SelfAddressingIdentifier::from_str(said)
+        .map_err(|e| format!("the identifier is not a digest keriox can read: {e}"))?;
+    if !parsed.verify_binding(&blank_said(&raw, said)) {
+        return Err(format!(
+            "keriox does not accept {said} as a digest of this credential's contents"
+        ));
+    }
+    Ok(format!("identifier verified {said}"))
+}
+
+/// Replace an identifier with the placeholder it was computed against.
+///
+/// A self-addressing identifier is the digest of the document with that field
+/// blanked to the same width — not of the document without it, and not of the
+/// document with the value present.
+fn blank_said(raw: &[u8], said: &str) -> Vec<u8> {
+    let dummy = "#".repeat(said.len());
+    String::from_utf8_lossy(raw)
+        .replacen(said, &dummy, 1)
+        .into_bytes()
+}
+
+/// Find where the JSON body ends, so an attachment does not confuse the parser.
+fn find_json_end(raw: &[u8]) -> usize {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (i, &b) in raw.iter().enumerate() {
+        if in_string {
+            match b {
+                _ if escaped => escaped = false,
+                b'\\' => escaped = true,
+                b'"' => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        match b {
+            b'"' => in_string = true,
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return i + 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    raw.len()
 }
