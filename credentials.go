@@ -842,7 +842,7 @@ func VerifyCredential(raw []byte) (*Credential, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkVersion(raw, protoACDC); err != nil {
+	if err := checkCredentialVersion(raw, protoACDC); err != nil {
 		return nil, err
 	}
 
@@ -854,12 +854,12 @@ func VerifyCredential(raw []byte) (*Credential, error) {
 	if err != nil {
 		return nil, fmt.Errorf("the attribute block is not canonical: %w", err)
 	}
-	attributeSAID, err := checkSAID(attributes, "", saidLabel)
+	attributeSAID, err := checkCredentialSAID(attributes, "", saidLabel)
 	if err != nil {
 		return nil, fmt.Errorf("the attribute block does not match its own identifier: %w", err)
 	}
 
-	said, err := checkSAID(sad, protoACDC, saidLabel)
+	said, err := checkCredentialSAID(sad, protoACDC, saidLabel)
 	if err != nil {
 		return nil, fmt.Errorf("the credential does not match its own identifier: %w", err)
 	}
@@ -897,7 +897,7 @@ func VerifySchema(raw []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	said, err := checkSAID(sad, "", schemaIDLabel)
+	said, err := checkCredentialSAID(sad, "", schemaIDLabel)
 	if err != nil {
 		return "", fmt.Errorf("the schema does not match its own identifier: %w", err)
 	}
@@ -931,7 +931,7 @@ func VerifyTELEvent(raw []byte) (*TELEvent, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkVersion(raw, protoKERI); err != nil {
+	if err := checkCredentialVersion(raw, protoKERI); err != nil {
 		return nil, err
 	}
 	ilk, ok := sad.getString("t")
@@ -949,7 +949,7 @@ func VerifyTELEvent(raw []byte) (*TELEvent, error) {
 		return nil, fmt.Errorf("%q is not a transaction event this understands", ilk)
 	}
 
-	said, err := checkSAID(sad, protoKERI, labels...)
+	said, err := checkCredentialSAID(sad, protoKERI, labels...)
 	if err != nil {
 		return nil, fmt.Errorf("the %s event does not match its own identifier: %w", ilk, err)
 	}
@@ -1059,12 +1059,12 @@ func parseCanonical(raw []byte) (jsonObject, error) {
 	return sad, nil
 }
 
-// checkVersion confirms the version string declares the length the bytes are.
+// checkCredentialVersion confirms the version string declares the length the bytes are.
 //
 // This is what makes a serialised event self-delimiting inside a stream. An
 // event whose declared size is wrong cuts the next one in half, so it is worth
 // catching here rather than three events later.
-func checkVersion(raw []byte, proto string) error {
+func checkCredentialVersion(raw []byte, proto string) error {
 	if !leadingVersion.Match(raw) {
 		return fmt.Errorf("the bytes do not begin with a version string, so they are not " +
 			"canonical serialisation")
@@ -1081,8 +1081,8 @@ func checkVersion(raw []byte, proto string) error {
 	return nil
 }
 
-// checkSAID recomputes an identifier and compares it with the one written.
-func checkSAID(sad jsonObject, proto string, labels ...string) (string, error) {
+// checkCredentialSAID recomputes an identifier and compares it with the one written.
+func checkCredentialSAID(sad jsonObject, proto string, labels ...string) (string, error) {
 	if len(labels) == 0 {
 		return "", fmt.Errorf("no identifier field was named, so nothing would be checked")
 	}

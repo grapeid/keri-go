@@ -766,12 +766,12 @@ func validateEvent(fs *faults, raw []byte) *Event {
 		return ev
 	}
 	checkSchema(fs, ev, schema)
-	checkVersion(fs, ev)
+	checkEventVersion(fs, ev)
 
 	// A receipt's d names the event being receipted, not the receipt itself, so
 	// the self-addressing check does not apply to it.
 	if ev.Ilk != "rct" {
-		checkSAID(fs, ev)
+		checkEventSAID(fs, ev)
 		checkDerivation(fs, ev)
 	}
 	checkThresholds(fs, ev)
@@ -825,7 +825,7 @@ func checkSchema(fs *faults, ev *Event, schema []string) {
 	}
 }
 
-func checkVersion(fs *faults, ev *Event) {
+func checkEventVersion(fs *faults, ev *Event) {
 	if len(ev.Raw) < 6 || string(ev.Raw[:6]) != `{"v":"` {
 		fs.add(FaultVersionLength, "the event does not begin with its version string, so "+
 			"it is not canonical KERI serialisation")
@@ -852,7 +852,7 @@ func checkVersion(fs *faults, ev *Event) {
 	}
 }
 
-func checkSAID(fs *faults, ev *Event) {
+func checkEventSAID(fs *faults, ev *Event) {
 	want, err := computeSAID(ev)
 	if err != nil {
 		fs.add(FaultSAIDMismatch, "the event's identifier could not be re-derived: %v", err)
