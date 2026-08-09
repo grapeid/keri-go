@@ -39,8 +39,10 @@ func Answer(c Case) ([]byte, error) {
 	case "delegation":
 		// dip / drt — same seam as inception/rotation, not filled in yet.
 		return nil, ErrNotImplemented
-	case "credential", "receipt", "stream":
-		// ACDC / TEL, witness receipts, and CESR streams — not filled in yet.
+	case "credential":
+		return AnswerCredential(c)
+	case "receipt", "stream":
+		// Witness receipts and CESR streams — not filled in yet.
 		return nil, ErrNotImplemented
 	case "constants", "property", "reject":
 		// Asserted directly by their own tests rather than by producing bytes.
