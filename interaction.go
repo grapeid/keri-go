@@ -51,6 +51,10 @@ const saidPlaceholderLen = 44
 
 var versionPattern = regexp.MustCompile(`KERI[0-9a-f]{2}JSON[0-9a-f]{6}_`)
 
+// versionFieldOffset is where an event's own version string begins: immediately
+// after the opening `{"v":"`, because it is always the first field.
+const versionFieldOffset = 6
+
 // versionString declares the serialisation and the event's total size.
 func versionString(size int) string {
 	return fmt.Sprintf("KERI10JSON%06x_", size)
@@ -119,10 +123,26 @@ func serialize(event interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !versionPattern.Match(raw) {
+	// Only the event's OWN version string, which is always the first field.
+	//
+	// Replacing every match corrupts content: a seal or a claim whose value
+	// happens to look like a version string gets silently rewritten, and since
+	// the digest is taken over these bytes, the event ends up with an identifier
+	// nobody else computes. Nothing in the vectors contains such a value, so
+	// this would have shipped and then failed on somebody's real data.
+	loc := versionPattern.FindIndex(raw)
+	if loc == nil {
 		return nil, fmt.Errorf("the event carries no version string to fill in")
 	}
-	patched := versionPattern.ReplaceAll(raw, []byte(versionString(len(raw))))
+	if loc[0] != versionFieldOffset {
+		// The version string is the first field of a KERI event. Finding it
+		// anywhere else means this is not one, and patching whatever was found
+		// would produce something worse than an error.
+		return nil, fmt.Errorf("the version string is at offset %d, not %d, so this is "+
+			"not a KERI event", loc[0], versionFieldOffset)
+	}
+	patched := append(append([]byte{}, raw[:loc[0]]...),
+		append([]byte(versionString(len(raw))), raw[loc[1]:]...)...)
 	if len(patched) != len(raw) {
 		return nil, fmt.Errorf("declaring the size changed the length, from %d to %d",
 			len(raw), len(patched))
