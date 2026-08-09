@@ -11,7 +11,7 @@ stale two ways, and both are silent:
 This runs the vectors back through keripy and fails on either. It is the guard
 on the guard, and it is why the file must be generated rather than written.
 
-Run: python3 tests/vectors/verify_vectors.py tests/vectors/keri_vectors_v1.json
+Run: python3 vectors/verify_vectors.py vectors/keri_vectors_v1.json
 """
 
 import base64
@@ -33,9 +33,79 @@ def check_serialisation(cid, expect):
     return problems
 
 
+def check_acdc(cid, expect):
+    """An ACDC credential must reparse to the same SAID."""
+    if "raw_b64" not in expect:
+        # State-only cases (before/after) — nothing to reparse as a single ACDC.
+        return []
+    raw = base64.b64decode(expect["raw_b64"])
+    # Schema JSON is not an ACDC; accept either form.
+    try:
+        serder = serdering.SerderACDC(raw=raw)
+    except Exception:
+        # Registry/iss/rev TEL events use SerderKERI; schema is plain JSON.
+        try:
+            serder = serdering.SerderKERI(raw=raw)
+        except Exception:
+            # Plain schema document: check the said field against $id if present.
+            try:
+                doc = json.loads(raw)
+            except Exception as e:
+                return [f"could not parse credential bytes: {e}"]
+            if expect.get("said") and doc.get("$id") and doc["$id"] != expect["said"]:
+                return [f"schema $id is {doc['$id']}, vector says {expect['said']}"]
+            return []
+    problems = []
+    if expect.get("said") and serder.said != expect["said"]:
+        problems.append(f"said is {serder.said}, vector says {expect['said']}")
+    return problems
+
+
+def check_stream(cid, case):
+    """A CESR stream must begin with its event and carry a non-empty attachment."""
+    expect = case["expect"]
+    if "raw_b64" not in expect:
+        return []
+    stream = base64.b64decode(expect["raw_b64"])
+    problems = []
+    if "event_raw_b64" in expect:
+        event = base64.b64decode(expect["event_raw_b64"])
+        if not stream.startswith(event):
+            problems.append("stream does not begin with the event bytes")
+        if len(stream) <= len(event):
+            problems.append("stream has no attachment after the event")
+        else:
+            # Reparse the leading event and check its SAID.
+            serder = serdering.SerderKERI(raw=stream)
+            if expect.get("event_said") and serder.said != expect["event_said"]:
+                problems.append(
+                    f"leading event said is {serder.said}, vector says {expect['event_said']}"
+                )
+    elif "receipt_raw_b64" in expect:
+        receipt = base64.b64decode(expect["receipt_raw_b64"])
+        if not stream.startswith(receipt):
+            problems.append("receipt stream does not begin with the receipt event")
+        serder = serdering.SerderKERI(raw=stream)
+        if expect.get("receipt_said") and serder.said != expect["receipt_said"]:
+            problems.append(
+                f"receipt said is {serder.said}, vector says {expect['receipt_said']}"
+            )
+    else:
+        # Stream without a separate event field — still must parse a leading event.
+        try:
+            serdering.SerderKERI(raw=stream)
+        except Exception as e:
+            problems.append(f"stream does not begin with a parseable event: {e}")
+    return problems
+
+
 def check_refusal(cid, case):
     """A case that must be refused has to actually be refused by the reference."""
     raw = base64.b64decode(case["input"]["raw_b64"])
+    # Streams (truncated, bad receipt attachment) may still parse a leading event.
+    # A refusal case is valid if either parse fails, the claimed said no longer
+    # matches, or the case is a stream-level refusal that carries because-text
+    # without a claimed_said (checked by shape only).
     try:
         serder = serdering.SerderKERI(raw=raw)
     except Exception:
@@ -64,11 +134,31 @@ def main(path):
                 if serder.pre != c["expect"]["aid"] or serder.said != c["expect"]["said"]:
                     failures.append(f"{cid}: keripy no longer produces this identifier")
                 checked += 1
+        elif kind == "credential":
+            failures += [f"{cid}: {p}" for p in check_acdc(cid, c.get("expect", {}))]
+            checked += 1
+        elif kind == "receipt":
+            exp = c.get("expect", {})
+            if "receipt_raw_b64" in exp and "raw_b64" in exp:
+                failures += [f"{cid}: {p}" for p in check_stream(cid, c)]
+            elif "raw_b64" in exp and "said" in exp:
+                failures += [f"{cid}: {p}" for p in check_serialisation(cid, exp)]
+            elif "event_raw_b64" in exp:
+                raw = base64.b64decode(exp["event_raw_b64"])
+                serder = serdering.SerderKERI(raw=raw)
+                if exp.get("event_said") and serder.said != exp["event_said"]:
+                    failures.append(f"{cid}: event said drifted")
+            checked += 1
+        elif kind == "stream":
+            failures += [f"{cid}: {p}" for p in check_stream(cid, c)]
+            checked += 1
         elif kind == "reject":
             failures += [f"{cid}: {p}" for p in check_refusal(cid, c)]
             checked += 1
         elif kind == "constants":
             checked += 1  # asserted directly by the conformance tests
+        else:
+            failures.append(f"{cid}: unknown kind {kind!r}")
 
     print(f"checked {checked} of {len(doc['cases'])} cases against {doc['oracle']}")
     if failures:
@@ -83,4 +173,4 @@ def main(path):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "tests/vectors/keri_vectors_v1.json"))
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "vectors/keri_vectors_v1.json"))

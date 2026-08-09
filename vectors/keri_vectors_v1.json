@@ -14,7 +14,12 @@
         "ed25519_pubkey": "D",
         "ed25519_pubkey_nontransferable": "B",
         "ed25519_seed": "A",
-        "ed25519_sig": "0B"
+        "ed25519_sig": "0B",
+        "controller_idx_sigs": "-A",
+        "witness_idx_sigs": "-B",
+        "nontrans_receipt_couples": "-C",
+        "trans_receipt_quadruples": "-D",
+        "attached_material_quadlets": "-V"
       }
     },
     {
@@ -1657,6 +1662,779 @@
           "ba": [],
           "a": []
         }
+      }
+    },
+    {
+      "id": "acdc/schema/test-credential",
+      "kind": "credential",
+      "why": "A credential's schema SAID is part of what a verifier checks offline. An implementation that recomputes a different SAID for the same schema rejects every credential issued against it, or accepts forged ones.",
+      "input": {
+        "schema": {
+          "$id": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "TestCredential",
+          "description": "Schema used only by the conformance vectors",
+          "type": "object",
+          "properties": {
+            "d": {
+              "type": "string"
+            },
+            "i": {
+              "type": "string"
+            },
+            "dt": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "score": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "dt"
+          ]
+        }
+      },
+      "expect": {
+        "raw_b64": "eyIkaWQiOiJFQ0sweFpsa2ptUG9PdjBOR0dGeTItX2pfZTl6YzB5eGF5SEgwcE5lb3g4dyIsIiRzY2hlbWEiOiJodHRwOi8vanNvbi1zY2hlbWEub3JnL2RyYWZ0LTA3L3NjaGVtYSMiLCJ0aXRsZSI6IlRlc3RDcmVkZW50aWFsIiwiZGVzY3JpcHRpb24iOiJTY2hlbWEgdXNlZCBvbmx5IGJ5IHRoZSBjb25mb3JtYW5jZSB2ZWN0b3JzIiwidHlwZSI6Im9iamVjdCIsInByb3BlcnRpZXMiOnsiZCI6eyJ0eXBlIjoic3RyaW5nIn0sImkiOnsidHlwZSI6InN0cmluZyJ9LCJkdCI6eyJ0eXBlIjoic3RyaW5nIn0sIm5hbWUiOnsidHlwZSI6InN0cmluZyJ9LCJzY29yZSI6eyJ0eXBlIjoiaW50ZWdlciJ9fSwiYWRkaXRpb25hbFByb3BlcnRpZXMiOnRydWUsInJlcXVpcmVkIjpbImR0Il19",
+        "said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "schema_readable": {
+          "$id": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "TestCredential",
+          "description": "Schema used only by the conformance vectors",
+          "type": "object",
+          "properties": {
+            "d": {
+              "type": "string"
+            },
+            "i": {
+              "type": "string"
+            },
+            "dt": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "score": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "dt"
+          ]
+        }
+      }
+    },
+    {
+      "id": "acdc/registry/vcp-backerless",
+      "kind": "credential",
+      "why": "A credential registry is itself a self-addressing identifier. An implementation that formats the registry inception differently produces a registry no issued credential will name, so every issuance fails to bind.",
+      "input": {
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "toad": 0,
+        "backers": [],
+        "nonce": "0AB2dnZ2dnZ2dnZ2dnZ2dnZ2",
+        "issuer_inception_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDEyYl8iLCJ0IjoiaWNwIiwiZCI6IkVIUGhhTkJYY1NFV2dSdUQ2X2VLVWpUekRSSkFsb1RzZHNsRnhMVm1iOVUwIiwiaSI6IkRHTER6aGc3Vk8xVUVGT3M0QXYtZ1VVN2hjUmJkdnlPXzVudzdJYktCclF0IiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRHTER6aGc3Vk8xVUVGT3M0QXYtZ1VVN2hjUmJkdnlPXzVudzdJYktCclF0Il0sIm50IjoiMSIsIm4iOlsiRVBhRlBXV0VBQlYyQW5aZU0xUXF6UTd6Sld4MGF6RTloMktjVUI5ZE0zc0IiXSwiYnQiOiIwIiwiYiI6W10sImMiOltdLCJhIjpbXX0="
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDBmYl8iLCJ0IjoidmNwIiwiZCI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwiaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwiaWkiOiJER0xEemhnN1ZPMVVFRk9zNEF2LWdVVTdoY1JiZHZ5T181bnc3SWJLQnJRdCIsInMiOiIwIiwiYyI6W10sImJ0IjoiMCIsImIiOltdLCJuIjoiMEFCMmRuWjJkbloyZG5aMmRuWjJkbloyIn0=",
+        "said": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "aid": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "event_readable": {
+          "v": "KERI10JSON0000fb_",
+          "t": "vcp",
+          "d": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+          "i": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+          "ii": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+          "s": "0",
+          "c": [],
+          "bt": "0",
+          "b": [],
+          "n": "0AB2dnZ2dnZ2dnZ2dnZ2dnZ2"
+        }
+      }
+    },
+    {
+      "id": "acdc/issued-into-registry",
+      "kind": "credential",
+      "why": "A registry-backed credential names its registry in ri, and its own SAID is a digest of its canonical bytes. A verifier offline must recompute that SAID exactly; any other serialisation means the credential cannot be checked.",
+      "input": {
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "recipient": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "data": {
+          "name": "Alice",
+          "dt": "2024-01-01T00:00:00.000000+00:00",
+          "score": 42
+        }
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiQUNEQzEwSlNPTjAwMDE5NF8iLCJkIjoiRUNnSVVVc1dhWjhIU2o1aWV6ODc2OFBFcEcxeE4wYmNaRjdOOHdWWWw1UzMiLCJpIjoiREdMRHpoZzdWTzFVRUZPczRBdi1nVVU3aGNSYmR2eU9fNW53N0liS0JyUXQiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwicyI6IkVDSzB4Wmxram1Qb092ME5HR0Z5Mi1fal9lOXpjMHl4YXlISDBwTmVveDh3IiwiYSI6eyJkIjoiRUVGRjlqczdrT09zSXlBY2tTMHpZVldiSGJpMmVHbXQtMFdfdWdxVkFxM2ciLCJpIjoiREdwbzJiczdncTh3TjNYenBYUkR1RzlSYVkzbXhlUTlVa0ttZnI3YUwwZy0iLCJkdCI6IjIwMjQtMDEtMDFUMDA6MDA6MDAuMDAwMDAwKzAwOjAwIiwibmFtZSI6IkFsaWNlIiwic2NvcmUiOjQyfX0=",
+        "said": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "subject_said": "EEFF9js7kOOsIyAckS0zYVWbHbi2eGmt-0W_ugqVAq3g",
+        "credential_readable": {
+          "v": "ACDC10JSON000194_",
+          "d": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+          "i": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+          "ri": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+          "s": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+          "a": {
+            "d": "EEFF9js7kOOsIyAckS0zYVWbHbi2eGmt-0W_ugqVAq3g",
+            "i": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+            "dt": "2024-01-01T00:00:00.000000+00:00",
+            "name": "Alice",
+            "score": 42
+          }
+        }
+      }
+    },
+    {
+      "id": "acdc/issued-without-registry",
+      "kind": "credential",
+      "why": "Not every credential is registry-backed. Omitting ri is part of the serialisation: inventing a registry field, or requiring one, produces a different SAID and a credential no peer recognises.",
+      "input": {
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "recipient": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+        "registry": null,
+        "data": {
+          "name": "Alice",
+          "dt": "2024-01-01T00:00:00.000000+00:00",
+          "score": 42
+        }
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiQUNEQzEwSlNPTjAwMDE2MF8iLCJkIjoiRU0tUmNrWjRUX2paaDJ5dVMxU1llcGM0dHd4TUdyZ0hKblkyTTZxTk5RNXUiLCJpIjoiREdMRHpoZzdWTzFVRUZPczRBdi1nVVU3aGNSYmR2eU9fNW53N0liS0JyUXQiLCJzIjoiRUNLMHhabGtqbVBvT3YwTkdHRnkyLV9qX2U5emMweXhheUhIMHBOZW94OHciLCJhIjp7ImQiOiJFRUZGOWpzN2tPT3NJeUFja1MwellWV2JIYmkyZUdtdC0wV191Z3FWQXEzZyIsImkiOiJER3BvMmJzN2dxOHdOM1h6cFhSRHVHOVJhWTNteGVROVVrS21mcjdhTDBnLSIsImR0IjoiMjAyNC0wMS0wMVQwMDowMDowMC4wMDAwMDArMDA6MDAiLCJuYW1lIjoiQWxpY2UiLCJzY29yZSI6NDJ9fQ==",
+        "said": "EM-RckZ4T_jZh2yuS1SYepc4twxMGrgHJnY2M6qNNQ5u",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "registry": null,
+        "subject_said": "EEFF9js7kOOsIyAckS0zYVWbHbi2eGmt-0W_ugqVAq3g",
+        "credential_readable": {
+          "v": "ACDC10JSON000160_",
+          "d": "EM-RckZ4T_jZh2yuS1SYepc4twxMGrgHJnY2M6qNNQ5u",
+          "i": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+          "s": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+          "a": {
+            "d": "EEFF9js7kOOsIyAckS0zYVWbHbi2eGmt-0W_ugqVAq3g",
+            "i": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+            "dt": "2024-01-01T00:00:00.000000+00:00",
+            "name": "Alice",
+            "score": 42
+          }
+        }
+      }
+    },
+    {
+      "id": "acdc/issuance-event/iss",
+      "kind": "credential",
+      "why": "Issuance is a TEL event whose identifier is the credential's SAID. An implementation that digests the wrong fields, or that points ri at the issuer rather than the registry, cannot be reconciled with any peer's TEL.",
+      "input": {
+        "credential_said": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "dt": "2024-01-01T00:00:00.000000+00:00",
+        "credential_raw_b64": "eyJ2IjoiQUNEQzEwSlNPTjAwMDE5NF8iLCJkIjoiRUNnSVVVc1dhWjhIU2o1aWV6ODc2OFBFcEcxeE4wYmNaRjdOOHdWWWw1UzMiLCJpIjoiREdMRHpoZzdWTzFVRUZPczRBdi1nVVU3aGNSYmR2eU9fNW53N0liS0JyUXQiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwicyI6IkVDSzB4Wmxram1Qb092ME5HR0Z5Mi1fal9lOXpjMHl4YXlISDBwTmVveDh3IiwiYSI6eyJkIjoiRUVGRjlqczdrT09zSXlBY2tTMHpZVldiSGJpMmVHbXQtMFdfdWdxVkFxM2ciLCJpIjoiREdwbzJiczdncTh3TjNYenBYUkR1RzlSYVkzbXhlUTlVa0ttZnI3YUwwZy0iLCJkdCI6IjIwMjQtMDEtMDFUMDA6MDA6MDAuMDAwMDAwKzAwOjAwIiwibmFtZSI6IkFsaWNlIiwic2NvcmUiOjQyfX0=",
+        "registry_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDBmYl8iLCJ0IjoidmNwIiwiZCI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwiaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwiaWkiOiJER0xEemhnN1ZPMVVFRk9zNEF2LWdVVTdoY1JiZHZ5T181bnc3SWJLQnJRdCIsInMiOiIwIiwiYyI6W10sImJ0IjoiMCIsImIiOltdLCJuIjoiMEFCMmRuWjJkbloyZG5aMmRuWjJkbloyIn0="
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDBlZF8iLCJ0IjoiaXNzIiwiZCI6IkVIT1FpUzVCNTdfdjR4SFJURV9IZTd2cDRvSWtjMnhibTgwNVRhdURRdjc5IiwiaSI6IkVDZ0lVVXNXYVo4SFNqNWllejg3NjhQRXBHMXhOMGJjWkY3Tjh3VllsNVMzIiwicyI6IjAiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwiZHQiOiIyMDI0LTAxLTAxVDAwOjAwOjAwLjAwMDAwMCswMDowMCJ9",
+        "said": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79",
+        "aid": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+        "event_readable": {
+          "v": "KERI10JSON0000ed_",
+          "t": "iss",
+          "d": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79",
+          "i": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+          "s": "0",
+          "ri": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+          "dt": "2024-01-01T00:00:00.000000+00:00"
+        }
+      }
+    },
+    {
+      "id": "acdc/issuance-anchor/ixn",
+      "kind": "interaction",
+      "why": "A registry issuance is only bound to the issuer when the issuer anchors it. The seal carries the registry, the TEL sequence number and the iss SAID \u2014 any other shape is not an issuance anchor and will not verify offline.",
+      "input": {
+        "prefix": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "prior_said": "EHPhaNBXcSEWgRuD6_eKUjTzDRJAloTsdslFxLVmb9U0",
+        "sn": 1,
+        "data": [
+          {
+            "i": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+            "s": "0",
+            "d": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79"
+          }
+        ],
+        "credential_said": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+        "iss_said": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79",
+        "prior_event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDEyYl8iLCJ0IjoiaWNwIiwiZCI6IkVIUGhhTkJYY1NFV2dSdUQ2X2VLVWpUekRSSkFsb1RzZHNsRnhMVm1iOVUwIiwiaSI6IkRHTER6aGc3Vk8xVUVGT3M0QXYtZ1VVN2hjUmJkdnlPXzVudzdJYktCclF0IiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRHTER6aGc3Vk8xVUVGT3M0QXYtZ1VVN2hjUmJkdnlPXzVudzdJYktCclF0Il0sIm50IjoiMSIsIm4iOlsiRVBhRlBXV0VBQlYyQW5aZU0xUXF6UTd6Sld4MGF6RTloMktjVUI5ZE0zc0IiXSwiYnQiOiIwIiwiYiI6W10sImMiOltdLCJhIjpbXX0="
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDEzYV8iLCJ0IjoiaXhuIiwiZCI6IkVJSnIzek4teTJHbG1kVGFRcjduUkRmRHNnNDd5WVJEVlE4VDlVN2o4QjR1IiwiaSI6IkRHTER6aGc3Vk8xVUVGT3M0QXYtZ1VVN2hjUmJkdnlPXzVudzdJYktCclF0IiwicyI6IjEiLCJwIjoiRUhQaGFOQlhjU0VXZ1J1RDZfZUtValR6RFJKQWxvVHNkc2xGeExWbWI5VTAiLCJhIjpbeyJpIjoiRU5yU0ZyeE9NcjVHVV9CV1VFYUp0THRkN2wtNWVlYkdPLS1RWDNfbzdsb28iLCJzIjoiMCIsImQiOiJFSE9RaVM1QjU3X3Y0eEhSVEVfSGU3dnA0b0lrYzJ4Ym04MDVUYXVEUXY3OSJ9XX0=",
+        "said": "EIJr3zN-y2GlmdTaQr7nRDfDsg47yYRDVQ8T9U7j8B4u",
+        "aid": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "event_readable": {
+          "v": "KERI10JSON00013a_",
+          "t": "ixn",
+          "d": "EIJr3zN-y2GlmdTaQr7nRDfDsg47yYRDVQ8T9U7j8B4u",
+          "i": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+          "s": "1",
+          "p": "EHPhaNBXcSEWgRuD6_eKUjTzDRJAloTsdslFxLVmb9U0",
+          "a": [
+            {
+              "i": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+              "s": "0",
+              "d": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "acdc/with-edge",
+      "kind": "credential",
+      "why": "An edge chains one credential to another. The edge is inside the SAID, so dropping it, reordering it, or changing the nested schema reference produces a different credential that no longer proves the link.",
+      "input": {
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "recipient": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "data": {
+          "name": "Carol",
+          "dt": "2024-01-01T00:00:00.000000+00:00"
+        },
+        "source": {
+          "n": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+          "s": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w"
+        }
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiQUNEQzEwSlNPTjAwMDFmNV8iLCJkIjoiRU1pYkdOX3dYR3VTZmszQ3ppMWZqNFJrZTZYdmE2ekJvLVg3S0h6ejJHa0ciLCJpIjoiREdMRHpoZzdWTzFVRUZPczRBdi1nVVU3aGNSYmR2eU9fNW53N0liS0JyUXQiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwicyI6IkVDSzB4Wmxram1Qb092ME5HR0Z5Mi1fal9lOXpjMHl4YXlISDBwTmVveDh3IiwiYSI6eyJkIjoiRUMtNmVQRGJqQmFNZzVkWXhnM1FUUWJiVnc2THpTM3hvcEQzQzVGS3NDSFMiLCJpIjoiREdwbzJiczdncTh3TjNYenBYUkR1RzlSYVkzbXhlUTlVa0ttZnI3YUwwZy0iLCJkdCI6IjIwMjQtMDEtMDFUMDA6MDA6MDAuMDAwMDAwKzAwOjAwIiwibmFtZSI6IkNhcm9sIn0sImUiOnsibiI6IkVDZ0lVVXNXYVo4SFNqNWllejg3NjhQRXBHMXhOMGJjWkY3Tjh3VllsNVMzIiwicyI6IkVDSzB4Wmxram1Qb092ME5HR0Z5Mi1fal9lOXpjMHl4YXlISDBwTmVveDh3In19",
+        "said": "EMibGN_wXGuSfk3Czi1fj4Rke6Xva6zBo-X7KHzz2GkG",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "subject_said": "EC-6ePDbjBaMg5dYxg3QTQbbVw6LzS3xopD3C5FKsCHS",
+        "credential_readable": {
+          "v": "ACDC10JSON0001f5_",
+          "d": "EMibGN_wXGuSfk3Czi1fj4Rke6Xva6zBo-X7KHzz2GkG",
+          "i": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+          "ri": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+          "s": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+          "a": {
+            "d": "EC-6ePDbjBaMg5dYxg3QTQbbVw6LzS3xopD3C5FKsCHS",
+            "i": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+            "dt": "2024-01-01T00:00:00.000000+00:00",
+            "name": "Carol"
+          },
+          "e": {
+            "n": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+            "s": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w"
+          }
+        }
+      }
+    },
+    {
+      "id": "acdc/with-rules",
+      "kind": "credential",
+      "why": "Rules travel inside the credential and enter its SAID. An implementation that strips the rules section, or that serialises it differently, produces a credential whose digest no longer matches what was issued.",
+      "input": {
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "recipient": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "data": {
+          "name": "Dan",
+          "dt": "2024-01-01T00:00:00.000000+00:00"
+        },
+        "rules": [
+          {
+            "l": "usageDisclaimer",
+            "s": "use carefully"
+          }
+        ]
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiQUNEQzEwSlNPTjAwMDFiOV8iLCJkIjoiRU5sd2laZzF6czk4V0RGVW1ySjZoTHpYSk9DMEJLbDk0MjlzeFhpSGhLR1QiLCJpIjoiREdMRHpoZzdWTzFVRUZPczRBdi1nVVU3aGNSYmR2eU9fNW53N0liS0JyUXQiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwicyI6IkVDSzB4Wmxram1Qb092ME5HR0Z5Mi1fal9lOXpjMHl4YXlISDBwTmVveDh3IiwiYSI6eyJkIjoiRUdqSkwtYmhMWWlTNFRkUGxZalItbVhWSmZ5US1HQmhtaFoxeTZZNFlnUUEiLCJpIjoiREdwbzJiczdncTh3TjNYenBYUkR1RzlSYVkzbXhlUTlVa0ttZnI3YUwwZy0iLCJkdCI6IjIwMjQtMDEtMDFUMDA6MDA6MDAuMDAwMDAwKzAwOjAwIiwibmFtZSI6IkRhbiJ9LCJyIjpbeyJsIjoidXNhZ2VEaXNjbGFpbWVyIiwicyI6InVzZSBjYXJlZnVsbHkifV19",
+        "said": "ENlwiZg1zs98WDFUmrJ6hLzXJOC0BKl9429sxXiHhKGT",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "subject_said": "EGjJL-bhLYiS4TdPlYjR-mXVJfyQ-GBhmhZ1y6Y4YgQA",
+        "credential_readable": {
+          "v": "ACDC10JSON0001b9_",
+          "d": "ENlwiZg1zs98WDFUmrJ6hLzXJOC0BKl9429sxXiHhKGT",
+          "i": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+          "ri": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+          "s": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+          "a": {
+            "d": "EGjJL-bhLYiS4TdPlYjR-mXVJfyQ-GBhmhZ1y6Y4YgQA",
+            "i": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+            "dt": "2024-01-01T00:00:00.000000+00:00",
+            "name": "Dan"
+          },
+          "r": [
+            {
+              "l": "usageDisclaimer",
+              "s": "use carefully"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "acdc/private-with-salt",
+      "kind": "credential",
+      "why": "A privacy-preserving credential carries a salt (u) at the top level and in the subject. That salt is part of the SAID. An implementation that omits it, or that generates a fresh one on read, cannot verify a credential it did not itself issue \u2014 and selective disclosure depends on this form.",
+      "input": {
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "recipient": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "data": {
+          "name": "Eve",
+          "dt": "2024-01-01T00:00:00.000000+00:00",
+          "score": 7
+        },
+        "private": true,
+        "salt": "0ABzc3Nzc3Nzc3Nzc3Nzc3Nz"
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiQUNEQzEwSlNPTjAwMDFjZl8iLCJkIjoiRUhFR1R6YXZYR0duZmFiN3cxWDdoWUdmNWVkdTB3M0dub3hsM2NHMmpiY2UiLCJ1IjoiMEFCemMzTnpjM056YzNOemMzTnpjM056IiwiaSI6IkRHTER6aGc3Vk8xVUVGT3M0QXYtZ1VVN2hjUmJkdnlPXzVudzdJYktCclF0IiwicmkiOiJFTnJTRnJ4T01yNUdVX0JXVUVhSnRMdGQ3bC01ZWViR08tLVFYM19vN2xvbyIsInMiOiJFQ0sweFpsa2ptUG9PdjBOR0dGeTItX2pfZTl6YzB5eGF5SEgwcE5lb3g4dyIsImEiOnsiZCI6IkVFbUIxdG9ldjFITFdlNm1seldKd3cyNkpZWjlBelJIY1BRVmtkQWxpejdjIiwidSI6IjBBQnpjM056YzNOemMzTnpjM056YzNOeiIsImkiOiJER3BvMmJzN2dxOHdOM1h6cFhSRHVHOVJhWTNteGVROVVrS21mcjdhTDBnLSIsImR0IjoiMjAyNC0wMS0wMVQwMDowMDowMC4wMDAwMDArMDA6MDAiLCJuYW1lIjoiRXZlIiwic2NvcmUiOjd9fQ==",
+        "said": "EHEGTzavXGGnfab7w1X7hYGf5edu0w3Gnoxl3cG2jbce",
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "schema_said": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "subject_said": "EEmB1toev1HLWe6mlzWJww26JYZ9AzRHcPQVkdAliz7c",
+        "credential_readable": {
+          "v": "ACDC10JSON0001cf_",
+          "d": "EHEGTzavXGGnfab7w1X7hYGf5edu0w3Gnoxl3cG2jbce",
+          "u": "0ABzc3Nzc3Nzc3Nzc3Nzc3Nz",
+          "i": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+          "ri": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+          "s": "ECK0xZlkjmPoOv0NGGFy2-_j_e9zc0yxayHH0pNeox8w",
+          "a": {
+            "d": "EEmB1toev1HLWe6mlzWJww26JYZ9AzRHcPQVkdAliz7c",
+            "u": "0ABzc3Nzc3Nzc3Nzc3Nzc3Nz",
+            "i": "DGpo2bs7gq8wN3XzpXRDuG9RaY3mxeQ9UkKmfr7aL0g-",
+            "dt": "2024-01-01T00:00:00.000000+00:00",
+            "name": "Eve",
+            "score": 7
+          }
+        },
+        "salt": "0ABzc3Nzc3Nzc3Nzc3Nzc3Nz"
+      }
+    },
+    {
+      "id": "acdc/revocation-event/rev",
+      "kind": "credential",
+      "why": "Revocation is a TEL event that chains to the issuance by digest. An implementation that does not require that link, or that leaves the credential SAID pointing at a still-issued state, accepts revoked credentials as valid.",
+      "input": {
+        "credential_said": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "prior_iss_said": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79",
+        "dt": "2024-06-01T00:00:00.000000+00:00",
+        "iss_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDBlZF8iLCJ0IjoiaXNzIiwiZCI6IkVIT1FpUzVCNTdfdjR4SFJURV9IZTd2cDRvSWtjMnhibTgwNVRhdURRdjc5IiwiaSI6IkVDZ0lVVXNXYVo4SFNqNWllejg3NjhQRXBHMXhOMGJjWkY3Tjh3VllsNVMzIiwicyI6IjAiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwiZHQiOiIyMDI0LTAxLTAxVDAwOjAwOjAwLjAwMDAwMCswMDowMCJ9",
+        "credential_raw_b64": "eyJ2IjoiQUNEQzEwSlNPTjAwMDE5NF8iLCJkIjoiRUNnSVVVc1dhWjhIU2o1aWV6ODc2OFBFcEcxeE4wYmNaRjdOOHdWWWw1UzMiLCJpIjoiREdMRHpoZzdWTzFVRUZPczRBdi1nVVU3aGNSYmR2eU9fNW53N0liS0JyUXQiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwicyI6IkVDSzB4Wmxram1Qb092ME5HR0Z5Mi1fal9lOXpjMHl4YXlISDBwTmVveDh3IiwiYSI6eyJkIjoiRUVGRjlqczdrT09zSXlBY2tTMHpZVldiSGJpMmVHbXQtMFdfdWdxVkFxM2ciLCJpIjoiREdwbzJiczdncTh3TjNYenBYUkR1RzlSYVkzbXhlUTlVa0ttZnI3YUwwZy0iLCJkdCI6IjIwMjQtMDEtMDFUMDA6MDA6MDAuMDAwMDAwKzAwOjAwIiwibmFtZSI6IkFsaWNlIiwic2NvcmUiOjQyfX0="
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDEyMF8iLCJ0IjoicmV2IiwiZCI6IkVJR2JQdDJKczYweFFDd3IzRFhoRUV0Y3RTMmd5dG80Y3Y5cVJqay1KTE0zIiwiaSI6IkVDZ0lVVXNXYVo4SFNqNWllejg3NjhQRXBHMXhOMGJjWkY3Tjh3VllsNVMzIiwicyI6IjEiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwicCI6IkVIT1FpUzVCNTdfdjR4SFJURV9IZTd2cDRvSWtjMnhibTgwNVRhdURRdjc5IiwiZHQiOiIyMDI0LTA2LTAxVDAwOjAwOjAwLjAwMDAwMCswMDowMCJ9",
+        "said": "EIGbPt2Js60xQCwr3DXhEEtctS2gyto4cv9qRjk-JLM3",
+        "aid": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+        "event_readable": {
+          "v": "KERI10JSON000120_",
+          "t": "rev",
+          "d": "EIGbPt2Js60xQCwr3DXhEEtctS2gyto4cv9qRjk-JLM3",
+          "i": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+          "s": "1",
+          "ri": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+          "p": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79",
+          "dt": "2024-06-01T00:00:00.000000+00:00"
+        }
+      }
+    },
+    {
+      "id": "acdc/revocation-state/before-and-after",
+      "kind": "credential",
+      "why": "A verifier must know the TEL state of a credential: issued, then revoked. Capturing both events and their order is what makes an offline check decide correctly rather than assume 'present means valid'.",
+      "input": {
+        "credential_said": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+        "registry": "ENrSFrxOMr5GU_BWUEaJtLtd7l-5eebGO--QX3_o7loo",
+        "iss_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDBlZF8iLCJ0IjoiaXNzIiwiZCI6IkVIT1FpUzVCNTdfdjR4SFJURV9IZTd2cDRvSWtjMnhibTgwNVRhdURRdjc5IiwiaSI6IkVDZ0lVVXNXYVo4SFNqNWllejg3NjhQRXBHMXhOMGJjWkY3Tjh3VllsNVMzIiwicyI6IjAiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwiZHQiOiIyMDI0LTAxLTAxVDAwOjAwOjAwLjAwMDAwMCswMDowMCJ9",
+        "rev_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDEyMF8iLCJ0IjoicmV2IiwiZCI6IkVJR2JQdDJKczYweFFDd3IzRFhoRUV0Y3RTMmd5dG80Y3Y5cVJqay1KTE0zIiwiaSI6IkVDZ0lVVXNXYVo4SFNqNWllejg3NjhQRXBHMXhOMGJjWkY3Tjh3VllsNVMzIiwicyI6IjEiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwicCI6IkVIT1FpUzVCNTdfdjR4SFJURV9IZTd2cDRvSWtjMnhibTgwNVRhdURRdjc5IiwiZHQiOiIyMDI0LTA2LTAxVDAwOjAwOjAwLjAwMDAwMCswMDowMCJ9"
+      },
+      "expect": {
+        "credential_said": "ECgIUUsWaZ8HSj5iez8768PEpG1xN0bcZF7N8wVYl5S3",
+        "before": {
+          "ilk": "iss",
+          "said": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79",
+          "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDBlZF8iLCJ0IjoiaXNzIiwiZCI6IkVIT1FpUzVCNTdfdjR4SFJURV9IZTd2cDRvSWtjMnhibTgwNVRhdURRdjc5IiwiaSI6IkVDZ0lVVXNXYVo4SFNqNWllejg3NjhQRXBHMXhOMGJjWkY3Tjh3VllsNVMzIiwicyI6IjAiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwiZHQiOiIyMDI0LTAxLTAxVDAwOjAwOjAwLjAwMDAwMCswMDowMCJ9",
+          "state": "issued"
+        },
+        "after": {
+          "ilk": "rev",
+          "said": "EIGbPt2Js60xQCwr3DXhEEtctS2gyto4cv9qRjk-JLM3",
+          "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDEyMF8iLCJ0IjoicmV2IiwiZCI6IkVJR2JQdDJKczYweFFDd3IzRFhoRUV0Y3RTMmd5dG80Y3Y5cVJqay1KTE0zIiwiaSI6IkVDZ0lVVXNXYVo4SFNqNWllejg3NjhQRXBHMXhOMGJjWkY3Tjh3VllsNVMzIiwicyI6IjEiLCJyaSI6IkVOclNGcnhPTXI1R1VfQldVRWFKdEx0ZDdsLTVlZWJHTy0tUVgzX283bG9vIiwicCI6IkVIT1FpUzVCNTdfdjR4SFJURV9IZTd2cDRvSWtjMnhibTgwNVRhdURRdjc5IiwiZHQiOiIyMDI0LTA2LTAxVDAwOjAwOjAwLjAwMDAwMCswMDowMCJ9",
+          "prior_said": "EHOQiS5B57_v4xHRTE_He7vp4oIkc2xbm805TauDQv79",
+          "state": "revoked"
+        }
+      }
+    },
+    {
+      "id": "rct/body/for-inception",
+      "kind": "receipt",
+      "why": "A receipt names the event it covers by digest and sequence number. An implementation that points a receipt at the wrong digest is not covering the event it thinks it is, and peers will not count it toward the toad.",
+      "input": {
+        "prefix": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+        "sn": 0,
+        "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+          "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ],
+        "toad": 2
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifQ==",
+        "said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+        "event_readable": {
+          "v": "KERI10JSON000091_",
+          "t": "rct",
+          "d": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+          "i": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+          "s": "0"
+        }
+      }
+    },
+    {
+      "id": "rct/one-witness",
+      "kind": "receipt",
+      "why": "A single witness receipt is a stream: the receipt event plus a non-transferable couple (witness identifier + cigar). Witnesses are non-transferable, so the identifier IS the verifying key \u2014 capture enough that a checker holding only the key event can verify the cigar.",
+      "input": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "prefix": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+        "witness": "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+        "toad": 2,
+        "witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+          "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ]
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifS1DQUJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbjBCRFFkaWZrZFY5ZkpNcmI0RHcyS3dfa1RTOUdNU0ZGM29KNERYSWhBNUlLSXZPZEpEMmd1TFdSVDZmaks4Q29QTGIyY1pKSVhYQ3c2TFdHNjlJTTFfUUo=",
+        "receipt_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifQ==",
+        "receipt_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "witness": "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+        "cigar_qb64": "0BDQdifkdV9fJMrb4Dw2Kw_kTS9GMSFF3oJ4DXIhA5IKIvOdJD2guLWRT6fjK8CoPLb2cZJIXXCw6LWG69IM1_QJ",
+        "counter": "-C",
+        "threshold_met": false,
+        "receipt_count": 1,
+        "toad": 2
+      }
+    },
+    {
+      "id": "rct/three-witnesses",
+      "kind": "receipt",
+      "why": "Several witnesses sign the same event. The couples are ordered in the attachment; an implementation that drops one, reorders them, or deduplicates by key changes whether the toad is met.",
+      "input": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "prefix": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+        "witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+          "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ],
+        "toad": 2
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifS1DQURCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbjBCRFFkaWZrZFY5ZkpNcmI0RHcyS3dfa1RTOUdNU0ZGM29KNERYSWhBNUlLSXZPZEpEMmd1TFdSVDZmaks4Q29QTGIyY1pKSVhYQ3c2TFdHNjlJTTFfUUpCTzR4LUR5SXB4SVpwdno1dnVEYW04SW1JRmlQV2hXbUZGVlRVRTM1Wko1YzBCRG1hLTBVbEx3MHdsbDZwTFVDTkIxSkgxWEd3NUFnM0owQ2hOTWRrU3ItWTk4OEg5N05od2swNllNYlVqLTcxQnRNVk0wY19vS0w5SjNMYWQwZkhEd0RCRWRGMFp4bTdKRjUtaVVKY0ZaQW52RnBaN2FocDB2OWozcjlVbzlaWXdZVjBCQ0o1VHJFWmpIZ3ZaWFJGbmN2cmtYVW9uVkpoeHM2MTFrRnNBZ3hTZDZJRldLX3g5N3ZqNUYwWHNlZm1oUFo3Z2pYSnhMT3NuajI0c2p4ZGZWMXB3TUs=",
+        "receipt_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifQ==",
+        "receipt_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "couples": [
+          {
+            "witness": "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+            "cigar_qb64": "0BDQdifkdV9fJMrb4Dw2Kw_kTS9GMSFF3oJ4DXIhA5IKIvOdJD2guLWRT6fjK8CoPLb2cZJIXXCw6LWG69IM1_QJ"
+          },
+          {
+            "witness": "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+            "cigar_qb64": "0BDma-0UlLw0wll6pLUCNB1JH1XGw5Ag3J0ChNMdkSr-Y988H97Nhwk06YMbUj-71BtMVM0c_oKL9J3Lad0fHDwD"
+          },
+          {
+            "witness": "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV",
+            "cigar_qb64": "0BCJ5TrEZjHgvZXRFncvrkXUonVJhxs611kFsAgxSd6IFWK_x97vj5F0XsefmhPZ7gjXJxLOsnj24sjxdfV1pwMK"
+          }
+        ],
+        "counter": "-C",
+        "threshold_met": true,
+        "receipt_count": 3,
+        "toad": 2
+      }
+    },
+    {
+      "id": "rct/threshold/met",
+      "kind": "receipt",
+      "why": "The toad is met when enough designated witnesses have signed. An implementation that miscounts, or that counts signatures from keys not in the witness list, accepts events that are not fully witnessed.",
+      "input": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+          "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ],
+        "toad": 2,
+        "signing_witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c"
+        ]
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifS1DQUNCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbjBCRFFkaWZrZFY5ZkpNcmI0RHcyS3dfa1RTOUdNU0ZGM29KNERYSWhBNUlLSXZPZEpEMmd1TFdSVDZmaks4Q29QTGIyY1pKSVhYQ3c2TFdHNjlJTTFfUUpCTzR4LUR5SXB4SVpwdno1dnVEYW04SW1JRmlQV2hXbUZGVlRVRTM1Wko1YzBCRG1hLTBVbEx3MHdsbDZwTFVDTkIxSkgxWEd3NUFnM0owQ2hOTWRrU3ItWTk4OEg5N05od2swNllNYlVqLTcxQnRNVk0wY19vS0w5SjNMYWQwZkhEd0Q=",
+        "threshold_met": true,
+        "receipt_count": 2,
+        "toad": 2
+      }
+    },
+    {
+      "id": "rct/threshold/not-met",
+      "kind": "receipt",
+      "why": "One receipt against a toad of two is not enough. Treating it as met lets an event proceed without the witness protection the identity committed to at inception.",
+      "input": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+          "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ],
+        "toad": 2,
+        "signing_witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn"
+        ]
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifS1DQUJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbjBCRFFkaWZrZFY5ZkpNcmI0RHcyS3dfa1RTOUdNU0ZGM29KNERYSWhBNUlLSXZPZEpEMmd1TFdSVDZmaks4Q29QTGIyY1pKSVhYQ3c2TFdHNjlJTTFfUUo=",
+        "threshold_met": false,
+        "receipt_count": 1,
+        "toad": 2
+      }
+    },
+    {
+      "id": "reject/receipt-signature-invalid",
+      "kind": "reject",
+      "why": "A receipt whose signature does not verify must be refused. Accepting it counts a witness vote that was never cast, and the toad becomes meaningless.",
+      "input": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifS1DQUJCTWhUclE4TTByWVtycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbjBCRFFkaWZrZFY5ZkpNcmI0RHcyS3dfa1RTOUdNU0ZGM29KNERYSWhBNUlLSXZPZEpEMmd1TFdSVDZmaks4Q29QTGIyY1pKSVhYQ3c2TFdHNjlJTTFfUUo=",
+        "because": "the witness cigar does not verify under the witness identifier",
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "witness": "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+        "good_stream_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifS1DQUJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbjBCRFFkaWZrZFY5ZkpNcmI0RHcyS3dfa1RTOUdNU0ZGM29KNERYSWhBNUlLSXZPZEpEMmd1TFdSVDZmaks4Q29QTGIyY1pKSVhYQ3c2TFdHNjlJTTFfUUo="
+      },
+      "expect": {
+        "refused": true,
+        "because": "the witness cigar does not verify under the witness identifier"
+      }
+    },
+    {
+      "id": "reject/receipt-from-undesignated-witness",
+      "kind": "reject",
+      "why": "Only witnesses named at establishment may contribute to the toad. A receipt from anyone else must be refused \u2014 otherwise an attacker supplies as many 'witnesses' as they need.",
+      "input": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDA5MV8iLCJ0IjoicmN0IiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAifS1DQUJCSjZDQVhIOGU4a2hEZU5ITWREYVZ4NWQ0VVU1UFh0RXBUR01fNWtKcG8xcjBCQjlOLXZRVUVOMU5Vc2lxaTZxNGxjTHR1SE9zaU9LVTNaYWowc1RkS1lzU1I0Q2FXSWpoMXJxT2JEOFRtVXVCZjVGX1lCdWxMUk12RF8zQlRjeWdDQUc=",
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "designated_witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+          "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ],
+        "stranger": "BJ6CAXH8e8khDeNHMdDaVx5d4UU5PXtEpTGM_5kJpo1r",
+        "because": "the signing identifier is not in the event's witness list"
+      },
+      "expect": {
+        "refused": true,
+        "because": "the signing identifier is not in the event's witness list"
+      }
+    },
+    {
+      "id": "rct/context/event-and-controller-sig",
+      "kind": "receipt",
+      "why": "Receipts are checked against a specific event. Capturing the event bytes and the controller signature together is what lets a later implementation verify 'this is the event, this is who ran it, these are the witnesses' without inventing any of the three.",
+      "input": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+          "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ],
+        "toad": 2
+      },
+      "expect": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFiN18iLCJ0IjoiaWNwIiwiZCI6IkVLcmZ0UWhoaTNudjRSTzNpWUtUekpQS0RwYUxIR3poeEtrMzlxNWZMUFJlIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIyIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIiwiQkVkRjBaeG03SkY1LWlVSmNGWkFudkZwWjdhaHAwdjlqM3I5VW85Wll3WVYiXSwiYyI6W10sImEiOltdfQ==",
+        "event_said": "EKrftQhhi3nv4RO3iYKTzJPKDpaLHGzhxKk39q5fLPRe",
+        "aid": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+        "controller_siger_qb64": "AAC6c39HA8xMkc18mbYA_9PmORK-ZCD37u-ehqxl_QPvRoKEhQXTBDrAOvbsSdprz9O-Rrs9dK2X7gG3to1-fYYB",
+        "controller_key": "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+        "toad": 2,
+        "witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c",
+          "BEdF0Zxm7JF5-iUJcFZAnvFpZ7ahp0v9j3r9Uo9ZYwYV"
+        ]
+      }
+    },
+    {
+      "id": "stream/controller-sig/single",
+      "kind": "stream",
+      "why": "Events travel with their controller signature attached in a counted CESR stream. An implementation that can build events but cannot parse the attachment cannot accept anything that arrives on the wire.",
+      "input": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OF8iLCJ0IjoiaWNwIiwiZCI6IkVPdmFiRFB5WHhFYXlCZEFSc2NvZ1VySEE2bmZTTGwtSUt2Zm1JOE42WklvIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIxIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIl0sImMiOltdLCJhIjpbXX0=",
+        "controller_keys": [
+          "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+        ],
+        "sigers_qb64": [
+          "AADF3o844vJPRt-9NKBkOcThK-CnHO_fR24sgq38PqFdCRo6wKfZlf3NXupETgtOh6nAwOGBTixkPMGtc54bQFAN"
+        ]
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OF8iLCJ0IjoiaWNwIiwiZCI6IkVPdmFiRFB5WHhFYXlCZEFSc2NvZ1VySEE2bmZTTGwtSUt2Zm1JOE42WklvIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIxIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIl0sImMiOltdLCJhIjpbXX0tQUFCQUFERjNvODQ0dkpQUnQtOU5LQmtPY1RoSy1DbkhPX2ZSMjRzZ3EzOFBxRmRDUm82d0tmWmxmM05YdXBFVGd0T2g2bkF3T0dCVGl4a1BNR3RjNTRiUUZBTg==",
+        "event_said": "EOvabDPyXxEayBdARscogUrHA6nfSLl-IKvfmI8N6ZIo",
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OF8iLCJ0IjoiaWNwIiwiZCI6IkVPdmFiRFB5WHhFYXlCZEFSc2NvZ1VySEE2bmZTTGwtSUt2Zm1JOE42WklvIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIxIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIl0sImMiOltdLCJhIjpbXX0=",
+        "attachment_b64": "LUFBQkFBREYzbzg0NHZKUFJ0LTlOS0JrT2NUaEstQ25IT19mUjI0c2dxMzhQcUZkQ1JvNndLZlpsZjNOWHVwRVRndE9oNm5Bd09HQlRpeGtQTUd0YzU0YlFGQU4=",
+        "counters": [
+          {
+            "code": "-A",
+            "name": "ControllerIdxSigs"
+          }
+        ],
+        "signature_count": 1
+      }
+    },
+    {
+      "id": "stream/controller-sig/two-of-three",
+      "kind": "stream",
+      "why": "A multi-key identity attaches one indexed signature per signing key. Losing the index, reordering the sigers, or requiring all keys when the threshold is 2-of-3 breaks every multi-sig exchange.",
+      "input": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFlN18iLCJ0IjoiaWNwIiwiZCI6IkVBZ2ZsQ2c4N2gwZ2l2YkpEb2lVbWxNNzFFOVFzUFBSbHFjWWxySHhYdm1nIiwiaSI6IkVBZ2ZsQ2c4N2gwZ2l2YkpEb2lVbWxNNzFFOVFzUFBSbHFjWWxySHhYdm1nIiwicyI6IjAiLCJrdCI6IjIiLCJrIjpbIkRJc2pmWGlPanFydlZReHRFbGdqLWtYeF9WX0NteXlJdmZoeEVaUnhfQk1TIiwiREFGT1RaSXNXV280Q3RfSjd0Y2k2RFdDTHhJMmRoYVQ1THE3WWVHdnV3VHgiLCJETWh0QWEyTEw3YVVzaV8yRGp5ZG5uN1pEYlZnUjNLM1JGRFVDUk81cWN1diJdLCJudCI6IjIiLCJuIjpbIkVJbHB2VTFkaG1xSXlMTlZCQUphamw5Q092MktQWnVqU2I2eFIxc3l4MmVyIiwiRURUbC1hYXhDVjBraERsanBoTTlqemZ3U2Vkb1lqb0RxLUtRdE9RODA1MGYiLCJFRVA0cHdMWWVvM21xdXQ4cTMxelhDczF1clBlUTlsQU5GcmxEdmF6eloySyJdLCJidCI6IjAiLCJiIjpbXSwiYyI6W10sImEiOltdfQ==",
+        "controller_keys": [
+          "DIsjfXiOjqrvVQxtElgj-kXx_V_CmyyIvfhxEZRx_BMS",
+          "DAFOTZIsWWo4Ct_J7tci6DWCLxI2dhaT5Lq7YeGvuwTx",
+          "DMhtAa2LL7aUsi_2Djydnn7ZDbVgR3K3RFDUCRO5qcuv"
+        ],
+        "isith": "2",
+        "sigers_qb64": [
+          "AAC9lBuqw46gGhMscFe8-646kVqekhsyuSwIsqlBM3wW4cOPD56gsFnX6BhOGrP_OHpCqzcbmKfkz831bmo6wqIJ",
+          "ABDBskoN2mXB2g68TX3hA3cMfdXBhMJcsuOKyrhSGFj_sU6vM549FL1n4IRDgi6fvivsh19IOb92oLhSMRybK5sD"
+        ],
+        "indices": [
+          0,
+          1
+        ]
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFlN18iLCJ0IjoiaWNwIiwiZCI6IkVBZ2ZsQ2c4N2gwZ2l2YkpEb2lVbWxNNzFFOVFzUFBSbHFjWWxySHhYdm1nIiwiaSI6IkVBZ2ZsQ2c4N2gwZ2l2YkpEb2lVbWxNNzFFOVFzUFBSbHFjWWxySHhYdm1nIiwicyI6IjAiLCJrdCI6IjIiLCJrIjpbIkRJc2pmWGlPanFydlZReHRFbGdqLWtYeF9WX0NteXlJdmZoeEVaUnhfQk1TIiwiREFGT1RaSXNXV280Q3RfSjd0Y2k2RFdDTHhJMmRoYVQ1THE3WWVHdnV3VHgiLCJETWh0QWEyTEw3YVVzaV8yRGp5ZG5uN1pEYlZnUjNLM1JGRFVDUk81cWN1diJdLCJudCI6IjIiLCJuIjpbIkVJbHB2VTFkaG1xSXlMTlZCQUphamw5Q092MktQWnVqU2I2eFIxc3l4MmVyIiwiRURUbC1hYXhDVjBraERsanBoTTlqemZ3U2Vkb1lqb0RxLUtRdE9RODA1MGYiLCJFRVA0cHdMWWVvM21xdXQ4cTMxelhDczF1clBlUTlsQU5GcmxEdmF6eloySyJdLCJidCI6IjAiLCJiIjpbXSwiYyI6W10sImEiOltdfS1BQUNBQUM5bEJ1cXc0NmdHaE1zY0ZlOC02NDZrVnFla2hzeXVTd0lzcWxCTTN3VzRjT1BENTZnc0ZuWDZCaE9HclBfT0hwQ3F6Y2JtS2ZrejgzMWJtbzZ3cUlKQUJEQnNrb04ybVhCMmc2OFRYM2hBM2NNZmRYQmhNSmNzdU9LeXJoU0dGal9zVTZ2TTU0OUZMMW40SVJEZ2k2ZnZpdnNoMTlJT2I5Mm9MaFNNUnliSzVzRA==",
+        "event_said": "EAgflCg87h0givbJDoiUmlM71E9QsPPRlqcYlrHxXvmg",
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDFlN18iLCJ0IjoiaWNwIiwiZCI6IkVBZ2ZsQ2c4N2gwZ2l2YkpEb2lVbWxNNzFFOVFzUFBSbHFjWWxySHhYdm1nIiwiaSI6IkVBZ2ZsQ2c4N2gwZ2l2YkpEb2lVbWxNNzFFOVFzUFBSbHFjWWxySHhYdm1nIiwicyI6IjAiLCJrdCI6IjIiLCJrIjpbIkRJc2pmWGlPanFydlZReHRFbGdqLWtYeF9WX0NteXlJdmZoeEVaUnhfQk1TIiwiREFGT1RaSXNXV280Q3RfSjd0Y2k2RFdDTHhJMmRoYVQ1THE3WWVHdnV3VHgiLCJETWh0QWEyTEw3YVVzaV8yRGp5ZG5uN1pEYlZnUjNLM1JGRFVDUk81cWN1diJdLCJudCI6IjIiLCJuIjpbIkVJbHB2VTFkaG1xSXlMTlZCQUphamw5Q092MktQWnVqU2I2eFIxc3l4MmVyIiwiRURUbC1hYXhDVjBraERsanBoTTlqemZ3U2Vkb1lqb0RxLUtRdE9RODA1MGYiLCJFRVA0cHdMWWVvM21xdXQ4cTMxelhDczF1clBlUTlsQU5GcmxEdmF6eloySyJdLCJidCI6IjAiLCJiIjpbXSwiYyI6W10sImEiOltdfQ==",
+        "attachment_b64": "LUFBQ0FBQzlsQnVxdzQ2Z0doTXNjRmU4LTY0NmtWcWVraHN5dVN3SXNxbEJNM3dXNGNPUEQ1NmdzRm5YNkJoT0dyUF9PSHBDcXpjYm1LZmt6ODMxYm1vNndxSUpBQkRCc2tvTjJtWEIyZzY4VFgzaEEzY01mZFhCaE1KY3N1T0t5cmhTR0ZqX3NVNnZNNTQ5RkwxbjRJUkRnaTZmdml2c2gxOUlPYjkyb0xoU01SeWJLNXNE",
+        "counters": [
+          {
+            "code": "-A",
+            "name": "ControllerIdxSigs"
+          }
+        ],
+        "signature_count": 2,
+        "indices": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": "stream/controller-sig-and-witness-receipts",
+      "kind": "stream",
+      "why": "A fully witnessed message carries the controller signature group and the non-transferable receipt couples in one stream. The counter codes that introduce each group (-A, -C) are how a parser knows what follows; getting them wrong makes the rest of the stream unreadable.",
+      "input": {
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OF8iLCJ0IjoiaWNwIiwiZCI6IkVPdmFiRFB5WHhFYXlCZEFSc2NvZ1VySEE2bmZTTGwtSUt2Zm1JOE42WklvIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIxIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIl0sImMiOltdLCJhIjpbXX0=",
+        "controller_keys": [
+          "DK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd"
+        ],
+        "witnesses": [
+          "BMhTrQ8M0rYZrqks7sT9VqJNZJnVhM55JX5Fz9gTm2Cn",
+          "BO4x-DyIpxIZpvz5vuDam8ImIFiPWhWmFFVTUE35ZJ5c"
+        ],
+        "sigers_qb64": [
+          "AADF3o844vJPRt-9NKBkOcThK-CnHO_fR24sgq38PqFdCRo6wKfZlf3NXupETgtOh6nAwOGBTixkPMGtc54bQFAN"
+        ],
+        "cigars_qb64": [
+          "0BBGmNPoYXgnsmN2jDN3_zFS_OCsock353MMsaWgC7ekt_jDQqTStuQG9Z_7OFwXuXUV0V8q4TbH-Ud3-4hEEs0I",
+          "0BAce_4OsMbAtwddYnW_pmuUami66FTbtS8uOlXKLCR3pw-J0pQNWdzwB6l7QCGAvL5mWJBMUPM3zEriFI7Eqx0P"
+        ]
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OF8iLCJ0IjoiaWNwIiwiZCI6IkVPdmFiRFB5WHhFYXlCZEFSc2NvZ1VySEE2bmZTTGwtSUt2Zm1JOE42WklvIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIxIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIl0sImMiOltdLCJhIjpbXX0tQUFCQUFERjNvODQ0dkpQUnQtOU5LQmtPY1RoSy1DbkhPX2ZSMjRzZ3EzOFBxRmRDUm82d0tmWmxmM05YdXBFVGd0T2g2bkF3T0dCVGl4a1BNR3RjNTRiUUZBTi1DQUNCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbjBCQkdtTlBvWVhnbnNtTjJqRE4zX3pGU19PQ3NvY2szNTNNTXNhV2dDN2VrdF9qRFFxVFN0dVFHOVpfN09Gd1h1WFVWMFY4cTRUYkgtVWQzLTRoRUVzMElCTzR4LUR5SXB4SVpwdno1dnVEYW04SW1JRmlQV2hXbUZGVlRVRTM1Wko1YzBCQWNlXzRPc01iQXR3ZGRZbldfcG11VWFtaTY2RlRidFM4dU9sWEtMQ1IzcHctSjBwUU5XZHp3QjZsN1FDR0F2TDVtV0pCTVVQTTN6RXJpRkk3RXF4MFA=",
+        "event_said": "EOvabDPyXxEayBdARscogUrHA6nfSLl-IKvfmI8N6ZIo",
+        "event_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OF8iLCJ0IjoiaWNwIiwiZCI6IkVPdmFiRFB5WHhFYXlCZEFSc2NvZ1VySEE2bmZTTGwtSUt2Zm1JOE42WklvIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIxIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIl0sImMiOltdLCJhIjpbXX0=",
+        "attachment_b64": "LUFBQkFBREYzbzg0NHZKUFJ0LTlOS0JrT2NUaEstQ25IT19mUjI0c2dxMzhQcUZkQ1JvNndLZlpsZjNOWHVwRVRndE9oNm5Bd09HQlRpeGtQTUd0YzU0YlFGQU4tQ0FDQk1oVHJROE0wcllacnFrczdzVDlWcUpOWkpuVmhNNTVKWDVGejlnVG0yQ24wQkJHbU5Qb1lYZ25zbU4yakROM196RlNfT0Nzb2NrMzUzTU1zYVdnQzdla3RfakRRcVRTdHVRRzlaXzdPRndYdVhVVjBWOHE0VGJILVVkMy00aEVFczBJQk80eC1EeUlweElacHZ6NXZ1RGFtOEltSUZpUFdoV21GRlZUVUUzNVpKNWMwQkFjZV80T3NNYkF0d2RkWW5XX3BtdVVhbWk2NkZUYnRTOHVPbFhLTENSM3B3LUowcFFOV2R6d0I2bDdRQ0dBdkw1bVdKQk1VUE0zekVyaUZJN0VxeDBQ",
+        "counters": [
+          {
+            "code": "-A",
+            "name": "ControllerIdxSigs"
+          },
+          {
+            "code": "-C",
+            "name": "NonTransReceiptCouples"
+          }
+        ],
+        "signature_count": 1,
+        "receipt_count": 2
+      }
+    },
+    {
+      "id": "stream/counter-codes",
+      "kind": "constants",
+      "why": "Attachment groups are introduced by fixed CESR counter codes. An implementation that invents its own introducers cannot exchange signed events with any other KERI implementation.",
+      "input": {},
+      "expect": {
+        "ControllerIdxSigs": "-A",
+        "WitnessIdxSigs": "-B",
+        "NonTransReceiptCouples": "-C",
+        "TransReceiptQuadruples": "-D",
+        "AttachedMaterialQuadlets": "-V",
+        "example_stream_starts_with_event": true,
+        "example_attachment_prefix": "-AAB"
+      }
+    },
+    {
+      "id": "reject/stream-truncated",
+      "kind": "reject",
+      "why": "A truncated CESR stream must be refused. Accepting a partial attachment treats a missing signature as present, or fails later in a way that looks like a different bug.",
+      "input": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OF8iLCJ0IjoiaWNwIiwiZCI6IkVPdmFiRFB5WHhFYXlCZEFSc2NvZ1VySEE2bmZTTGwtSUt2Zm1JOE42WklvIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIxIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIl0sImMiOltdLCJhIjpbXX0tQUFCQUFERjNvODQ0dkpQUnQtOU5LQmtPY1RoSy1DbkhPX2ZSMjRzZ3EzOFBxRmRDUm82d0tmWmxmM05YdXBFVGd0T2g2bkF3T0dCVGl4a1BNR3Q=",
+        "because": "the stream ends before the attached material is complete",
+        "full_stream_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDE4OF8iLCJ0IjoiaWNwIiwiZCI6IkVPdmFiRFB5WHhFYXlCZEFSc2NvZ1VySEE2bmZTTGwtSUt2Zm1JOE42WklvIiwiaSI6IkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRLOEdvLU1wRnhUazgxYkJuSnNWelJsUjdHNW1ZcXAzdmdkVWZ5aVRnelFkIl0sIm50IjoiMSIsIm4iOlsiRUVYZWtVWXd5ZjRCbHYxVV9XRk1MN1lsaUJSOUdKWGZsM29zS3RJZXZLUU4iXSwiYnQiOiIxIiwiYiI6WyJCTWhUclE4TTByWVpycWtzN3NUOVZxSk5aSm5WaE01NUpYNUZ6OWdUbTJDbiIsIkJPNHgtRHlJcHhJWnB2ejV2dURhbThJbUlGaVBXaFdtRkZWVFVFMzVaSjVjIl0sImMiOltdLCJhIjpbXX0tQUFCQUFERjNvODQ0dkpQUnQtOU5LQmtPY1RoSy1DbkhPX2ZSMjRzZ3EzOFBxRmRDUm82d0tmWmxmM05YdXBFVGd0T2g2bkF3T0dCVGl4a1BNR3RjNTRiUUZBTg==",
+        "event_said": "EOvabDPyXxEayBdARscogUrHA6nfSLl-IKvfmI8N6ZIo"
+      },
+      "expect": {
+        "refused": true,
+        "because": "the stream ends before the attached material is complete"
       }
     },
     {
