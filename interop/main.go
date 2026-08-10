@@ -174,6 +174,79 @@ func main() {
 		Event: b64(wSigned.Event), Msg: b64(wSigned.Message), Extra: receipts,
 	})
 
+	// ---- a witnessed identity changing its witnesses -----------------------
+	//
+	// A rotation states witness changes as a DELTA — which to cut, which to add
+	// — and the receipts that make the rotation acceptable must come from the
+	// witness set the rotation establishes, not the one it replaces. Nothing had
+	// ever asked another implementation to accept one of these, so the delta
+	// arithmetic and the receipt threshold had only ever been checked against
+	// captured bytes.
+	rwa, rwb := signerFor('R', true), signerFor('S', true)
+	w4 := signerFor('z', false)
+
+	rwIcp, err := keri.BuildInception(keri.InceptionInput{
+		Keys: []string{pub(rwa)}, NextDigests: []string{digestOf(rwb)},
+		Witnesses: wits, Toad: intPtr(2),
+	})
+	must(err)
+	rwIcpEv, err := keri.ParseEvent(rwIcp)
+	must(err)
+	rwIcpSigned, err := keri.SignEvent(rwIcp, rwa)
+	must(err)
+	var rwReceipts []string
+	for _, w := range []keri.Signer{w1, w2} {
+		sig, err := w.Sign(rwIcp)
+		must(err)
+		stream, err := keri.BuildReceiptStream(
+			keri.ReceiptInput{Prefix: rwIcpEv.Identifier, SN: 0, EventSAID: rwIcpEv.SAID},
+			[]keri.ReceiptCouple{{Witness: pub(w), CigarQB64: mustCigar(sig)}},
+		)
+		must(err)
+		rwReceipts = append(rwReceipts, b64(stream))
+	}
+	cases = append(cases, kase{
+		Label: "icp/witnessed-for-rotation", Kind: "kel",
+		Why:   "a witnessed identity, so its witness set can then be changed",
+		Event: b64(rwIcpSigned.Event), Msg: b64(rwIcpSigned.Message), Extra: rwReceipts,
+	})
+
+	// Cut the third witness, add a fourth. The threshold stays at two.
+	newWits := []string{pub(w1), pub(w2), pub(w4)}
+	rwRot, err := keri.BuildRotation(keri.RotationInput{
+		Prefix: rwIcpEv.Identifier, Keys: []string{pub(rwb)}, PriorSAID: rwIcpEv.SAID,
+		SN: 1, NextDigests: []string{digestOf(signerFor('T', true))},
+		PriorWitnesses: wits,
+		Cuts:           []string{pub(w3)},
+		Adds:           []string{pub(w4)},
+		Toad:           intPtr(2),
+	})
+	must(err)
+	rwRotEv, err := keri.ParseEvent(rwRot)
+	must(err)
+	rwRotSigned, err := keri.SignEvent(rwRot, rwb)
+	must(err)
+	// Receipted by witnesses from the set the rotation ESTABLISHES, including
+	// the one it just added — a receipt from the cut witness would not count.
+	var rotReceipts []string
+	for _, w := range []keri.Signer{w1, w4} {
+		sig, err := w.Sign(rwRot)
+		must(err)
+		stream, err := keri.BuildReceiptStream(
+			keri.ReceiptInput{Prefix: rwIcpEv.Identifier, SN: 1, EventSAID: rwRotEv.SAID},
+			[]keri.ReceiptCouple{{Witness: pub(w), CigarQB64: mustCigar(sig)}},
+		)
+		must(err)
+		rotReceipts = append(rotReceipts, b64(stream))
+	}
+	_ = newWits
+	cases = append(cases, kase{
+		Label: "rot/witness-cut-and-add", Kind: "kel",
+		Why: "a rotation that cuts one witness and adds another, receipted by the " +
+			"set it establishes",
+		Event: b64(rwRotSigned.Event), Msg: b64(rwRotSigned.Message), Extra: rotReceipts,
+	})
+
 	// ---- delegation -------------------------------------------------------
 
 	// A delegated inception, plus the delegator's approval anchoring it.
