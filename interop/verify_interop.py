@@ -112,6 +112,29 @@ def judge_tel(kvy, tvy, case):
     return True, f"credential state is {et!r}"
 
 
+def judge_stream(kvy, case):
+    """A whole key log as one stream, handed to keripy in a single parse.
+
+    The messages carry no delimiter, so keripy has to find each boundary itself
+    from the version strings and attachment counters. If our framing is wrong by
+    a single character, everything after the first message is read from the
+    wrong offset — which is the failure this case exists to catch, and it cannot
+    be caught by validating the messages one at a time.
+    """
+    raw = d(case["message_b64"])
+    parsing.Parser(kvy=kvy).parse(ims=bytearray(raw))
+    kvy.processEscrows()
+
+    last = serdering.SerderKERI(raw=d(case["event_b64"]))
+    kever = kvy.kevers.get(last.pre)
+    if kever is None:
+        return False, "nothing was established from the stream"
+    if kever.serder.said != last.said:
+        return False, (f"the stream established up to {kever.serder.said} but its last "
+                       f"event is {last.said}, so a boundary was misread")
+    return True, f"whole log replayed, sn={kever.sn}"
+
+
 def judge_credential(case):
     """A credential is a document: its identifier must be a digest of itself."""
     raw = d(case["event_b64"])
@@ -148,6 +171,8 @@ def main():
                     ok, detail = judge_delegation(kvy, case)
                 elif kind == "tel":
                     ok, detail = judge_tel(kvy, tvy, case)
+                elif kind == "stream":
+                    ok, detail = judge_stream(kvy, case)
                 elif kind == "credential":
                     ok, detail = judge_credential(case)
                 else:

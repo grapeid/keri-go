@@ -16,7 +16,7 @@
 use std::{convert::TryFrom, sync::Arc};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
-use cesrox::parse;
+use cesrox::{parse, parse_many};
 use keri_core::{
     database::redb::RedbDatabase,
     event_message::signed_event_message::{Message, Notice},
@@ -93,6 +93,24 @@ fn main() {
         // green line would be worse than reporting them untested.
         if case.kind == "tel" {
             match judge_tel(&tel, &processor, case) {
+                Ok(detail) => {
+                    println!("  accepted {:30} {}", case.label, detail);
+                    accepted += 1;
+                }
+                Err(why) => {
+                    println!("  REFUSED  {:30} {}", case.label, why);
+                    refused += 1;
+                }
+            }
+            continue;
+        }
+        // A whole key log as one stream. The messages carry no delimiter, so
+        // keriox has to find each boundary itself from the version strings and
+        // attachment counters. A framing error of one character misreads
+        // everything after the first message — which validating them one at a
+        // time cannot catch.
+        if case.kind == "stream" {
+            match judge_stream(&processor, &storage, case) {
                 Ok(detail) => {
                     println!("  accepted {:30} {}", case.label, detail);
                     accepted += 1;
@@ -322,4 +340,55 @@ fn find_json_end(raw: &[u8]) -> usize {
         }
     }
     raw.len()
+}
+
+/// Replay a whole key log handed over as one stream.
+fn judge_stream<K>(
+    processor: &BasicProcessor<K>,
+    storage: &EventStorage<K>,
+    case: &Case,
+) -> Result<String, String>
+where
+    K: keri_core::database::EventDatabase + 'static,
+{
+    let raw = decode(&case.message_b64);
+    let (rest, parsed) = parse_many(&raw).map_err(|e| format!("the stream is not CESR: {e:?}"))?;
+    if !rest.is_empty() {
+        return Err(format!(
+            "{} bytes were left unparsed, so a message boundary was misread",
+            rest.len()
+        ));
+    }
+    let count = parsed.len();
+    // Take the final event from the stream itself rather than a separate field.
+    // The case's event_b64 holds a bare event with no attachments, and cesrox
+    // is a stream parser — handed one it reports it cannot read it, which looks
+    // identical to a malformed event and is not.
+    let mut last: Option<(keri_core::prefix::IdentifierPrefix, u64)> = None;
+    for p in parsed {
+        let msg = Message::try_from(p).map_err(|e| format!("not a KERI message: {e}"))?;
+        if let Message::Notice(Notice::Event(e)) = &msg {
+            last = Some((
+                e.event_message.data.get_prefix(),
+                e.event_message.data.get_sn(),
+            ));
+        }
+        processor
+            .process(&msg)
+            .map_err(|e| format!("a message in the stream was refused: {e}"))?;
+    }
+
+    // The last event must be what the log now stands at. A stream that parsed
+    // but established less than it carries has been split wrongly somewhere.
+    let (id, want_sn) = last.ok_or("the stream carried no key events")?;
+    match storage.get_state(&id) {
+        Some(state) if state.sn == want_sn => {
+            Ok(format!("{count} messages replayed, sn={}", state.sn))
+        }
+        Some(state) => Err(format!(
+            "the stream established up to sn={} but carries sn={}",
+            state.sn, want_sn
+        )),
+        None => Err("nothing was established from the stream".into()),
+    }
 }

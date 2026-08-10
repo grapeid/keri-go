@@ -211,6 +211,52 @@ func main() {
 		Extra: []string{b64(approvalSigned.Message)},
 	})
 
+	// ---- a whole key log published as one stream --------------------------
+	//
+	// This is what did:webs serves at keri.cesr. The messages are concatenated
+	// with no delimiter, so a reader has to know where each ends — which is the
+	// property being tested, not whether the bytes are individually valid.
+	pubChain, err := keri.NewKeychain(keri.NewMemoryKeyStore(), "published", 1)
+	must(err)
+	pk, err := pubChain.CurrentKeys()
+	must(err)
+	pn, err := pubChain.NextDigests()
+	must(err)
+	pIcp, err := keri.BuildInception(keri.InceptionInput{Keys: pk, NextDigests: pn})
+	must(err)
+	pIcpSigned, err := keri.SignEvent(pIcp, pubChain.Signers()...)
+	must(err)
+	pIcpEv, err := keri.ParseEvent(pIcp)
+	must(err)
+	pIxn, err := keri.BuildInteraction(keri.InteractionInput{
+		Prefix: pIcpEv.Identifier, PriorSAID: pIcpEv.SAID, SN: 1,
+		Data: []json.RawMessage{},
+	})
+	must(err)
+	pIxnSigned, err := keri.SignEvent(pIxn, pubChain.Signers()...)
+	must(err)
+	pIxnEv, err := keri.ParseEvent(pIxn)
+	must(err)
+	pRotKeys, pRotNext, err := pubChain.Rotate()
+	must(err)
+	pRot, err := keri.BuildRotation(keri.RotationInput{
+		Prefix: pIcpEv.Identifier, Keys: pRotKeys, PriorSAID: pIxnEv.SAID,
+		SN: 2, NextDigests: pRotNext,
+	})
+	must(err)
+	pRotSigned, err := keri.SignEvent(pRot, pubChain.Signers()...)
+	must(err)
+	published, err := keri.ExportKEL([][]byte{
+		pIcpSigned.Message, pIxnSigned.Message, pRotSigned.Message,
+	})
+	must(err)
+	cases = append(cases, kase{
+		Label: "kel/published-stream", Kind: "stream",
+		Why: "a whole key log as one CESR stream, the way did:webs serves it — " +
+			"three messages with no delimiter between them",
+		Event: b64(pRotSigned.Event), Msg: b64(published),
+	})
+
 	// ---- credentials and their transaction events -------------------------
 
 	emitCredentials(signerFor('t', true), signerFor('u', true))
