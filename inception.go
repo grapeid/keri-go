@@ -134,8 +134,28 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 		A: emptySealsIfNil(in.Data),
 	}
 
+	// Which derivation applies. The reference infers it from the key count
+	// unless told otherwise, and being told otherwise is a real requirement:
+	// a single-key identity may legitimately be self-addressing.
+	selfAddressing := len(in.Keys) != 1
+	switch in.Derivation {
+	case "":
+	case "self-addressing":
+		selfAddressing = true
+	case "basic":
+		if len(in.Keys) != 1 {
+			return nil, fmt.Errorf("basic derivation names the key as the identifier, so "+
+				"it needs exactly one key; %d were given", len(in.Keys))
+		}
+		selfAddressing = false
+	default:
+		return nil, fmt.Errorf("%q is not a derivation this package knows; use "+
+			"\"basic\", \"self-addressing\", or leave it empty for the default",
+			in.Derivation)
+	}
+
 	blank := strings.Repeat("#", saidPlaceholderLen)
-	if len(in.Keys) == 1 {
+	if !selfAddressing {
 		// Basic derivation. The identifier is the key, and it is written in
 		// BEFORE the digest is taken — so the SAID covers the real identifier,
 		// not a blank, and "d" therefore differs from "i" on these events.

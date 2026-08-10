@@ -86,6 +86,17 @@ type InceptionInput struct {
 	// DefaultVersion. It is carried on the input rather than set globally so
 	// that an agent can answer a 1.0 peer and a 2.0 peer concurrently.
 	Version Version `json:"version"`
+	// Derivation forces how the identifier is made, overriding the default.
+	//
+	// Empty means the reference's rule: basic when there is exactly one key,
+	// self-addressing otherwise. "self-addressing" forces a digest-derived
+	// identifier even for a single key, which the reference supports and which
+	// a caller must be able to ask for — an application that has issued
+	// self-addressing single-key identities cannot be served by an
+	// implementation that infers derivation from key count and will not be
+	// told otherwise. "basic" is accepted for symmetry and is only valid with
+	// one key.
+	Derivation string `json:"derivation"`
 }
 
 // RotationInput is what changing an identity's keys is given.
