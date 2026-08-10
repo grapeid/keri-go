@@ -1,23 +1,4 @@
-// Package keri is the Go implementation of the KERI event layer.
-//
-// It exists so that one implementation serves every platform this product runs
-// on. Today there are two — a Python sidecar on computers and a Rust library on
-// phones — and nearly every serious defect found in this subsystem came from
-// those two disagreeing quietly: events stored in a form the reference
-// implementation refuses, identities founded unsigned, key commitments silently
-// dropped. Each was invisible until something real was attempted, because a
-// second implementation does not announce that it differs.
-//
-// Go rather than another language for one reason that outweighs the others: the
-// Go core is already compiled into the mobile app. A phone cannot spawn a
-// helper process, so whatever runs there must be linked in, and this is already
-// linked in. Nothing else has to be introduced.
-//
-// The package is built against fixed vectors rather than against a reading of
-// the specification. An identifier IS a digest of its own event, so two
-// implementations agree byte for byte or they do not interoperate at all —
-// there is no partial credit, and no amount of review substitutes for checking
-// the bytes.
+// The conformance vectors: fixed answers this implementation is checked against.
 package keri
 
 import (
