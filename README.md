@@ -158,4 +158,6 @@ converts a disagreement with the whole KERI ecosystem into one nobody can see.
 
 ## Licence
 
-Apache-2.0. See `LICENSE`.
+Apache-2.0. See `LICENSE` and `NOTICE`.
+
+Copyright 2026 Rob Andersen.

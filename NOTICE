@@ -1,0 +1,9 @@
+keri-go
+Copyright 2026 Rob Andersen
+
+This product includes software developed as an implementation of KERI
+(Key Event Receipt Infrastructure).
+
+Its conformance vectors are captured from keripy
+(https://github.com/WebOfTrust/keripy), the reference implementation, which is
+licensed under the Apache License 2.0.

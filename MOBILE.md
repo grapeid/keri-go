@@ -46,17 +46,10 @@ Adding `golang.org/x/mobile` to this module would pull a mobile-binding
 dependency into a general-purpose library. The facade owns that dependency
 instead.
 
-## What blocks the integration
+## Binding it into an application
 
-`grapeid/keri-go` is **private**. `identity-bot`, which holds `mobilecore` and
-is where the binding would live, is **public**.
-
-A public Go module cannot depend on a private one — anyone cloning identity-bot
-would fail to build it, which for an open reference implementation is not a
-rough edge but a broken promise. So the integration cannot proceed until that is
-resolved one way or another, and the resolution is a decision about the open
-source boundary rather than an engineering one.
-
-Note also that today `mobilecore` starts the core with `EnableKeriDriver: false`
-— KERI on mobile is handled by the Rust library, which is exactly what this
-package exists to replace.
+The facade belongs in whichever module owns the mobile build, not here — it
+needs `golang.org/x/mobile`, and that dependency has no business in a
+general-purpose library. `mobile/kerimobile.go.example` is the facade that
+produced the framework and aar above, kept so the recipe does not have to be
+rediscovered.
