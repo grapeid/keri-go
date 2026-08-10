@@ -1,0 +1,65 @@
+// This file is an EXAMPLE, not part of the package — the .example suffix
+// keeps it out of the build.
+//
+// It is the binding facade that was used to produce a working iOS
+// xcframework and Android aar from this package, kept so the recipe is not
+// rediscovered. It belongs in whichever module owns the mobile build, not
+// here: it needs golang.org/x/mobile, and that dependency has no business in
+// a general-purpose library.
+//
+// Package kerimobile is a binding facade over keri-go for gomobile.
+//
+// gomobile supports a restricted set of types across the language boundary:
+// strings, byte slices, ints, errors, and pointers to structs — not slices of
+// strings, not maps, not interfaces with rich types. A library shaped for Go
+// therefore cannot be bound directly, and should not be reshaped to suit the
+// binding: keri-go is meant to be usable by anybody, and bending its API around
+// one consumer's toolchain would make it worse for everyone else.
+//
+// So this facade flattens. It takes and returns JSON, which crosses the
+// boundary as a string and is what the Flutter side wants anyway.
+package kerimobile
+
+import (
+	"encoding/json"
+
+	keri "github.com/grapeid/keri-go"
+)
+
+// Incept builds an inception event from a JSON description.
+func Incept(inputJSON string) (string, error) {
+	var in keri.InceptionInput
+	if err := json.Unmarshal([]byte(inputJSON), &in); err != nil {
+		return "", err
+	}
+	raw, err := keri.BuildInception(in)
+	if err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// ValidateLog checks a key log supplied as a JSON array of base64 messages.
+func ValidateLog(messagesJSON string) (string, error) {
+	var b64 []string
+	if err := json.Unmarshal([]byte(messagesJSON), &b64); err != nil {
+		return "", err
+	}
+	msgs := make([][]byte, 0, len(b64))
+	for _, s := range b64 {
+		msgs = append(msgs, []byte(s))
+	}
+	res, err := keri.ValidateSignedKEL(msgs)
+	if err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(res)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// Version reports which CESR version this build mints by default, so the app
+// can show it rather than assume it.
+func Version() string { return keri.DefaultVersion.String() }
