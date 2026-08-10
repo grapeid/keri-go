@@ -225,7 +225,11 @@ func (f *FileKeyStore) Signer(name string) (Signer, error) {
 	if err := json.Unmarshal(body, &record); err != nil {
 		return nil, fmt.Errorf("the key file for %q is not readable: %w", name, err)
 	}
-	if record.Kind != keyKind {
+	// An absent kind means the file predates the field, and only keys existed
+	// then. Treated as a key rather than refused: adding a required field to a
+	// stored record is how a released version stops reading its own data, and
+	// this one is public.
+	if record.Kind != "" && record.Kind != keyKind {
 		return nil, fmt.Errorf("%q holds %s material, not a signing key; read it with "+
 			"Secret", name, record.Kind)
 	}
