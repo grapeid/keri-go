@@ -57,10 +57,14 @@ type KeyStore interface {
 type MemoryKeyStore struct {
 	mu      sync.Mutex
 	signers map[string]Signer
+	// secrets holds material this package does not interpret — see
+	// SecretStore. Kept in a separate map so a secret can never be handed back
+	// as a signing key, or the reverse.
+	secrets map[string][]byte
 }
 
 func NewMemoryKeyStore() *MemoryKeyStore {
-	return &MemoryKeyStore{signers: map[string]Signer{}}
+	return &MemoryKeyStore{signers: map[string]Signer{}, secrets: map[string][]byte{}}
 }
 
 func (m *MemoryKeyStore) Generate(name string, transferable bool) (Signer, error) {

@@ -48,6 +48,9 @@ const (
 	keyFileVersion = 1
 	// masterKeyLen is the length of the key that protects the stored keys.
 	masterKeyLen = 32
+	// keyKind marks a file holding a signing key, as against opaque secret
+	// material. See storedKey.Kind.
+	keyKind = "key"
 )
 
 // FileKeyStore keeps keys on disk, encrypted under a master key.
@@ -60,7 +63,11 @@ type FileKeyStore struct {
 // storedKey is what a key file holds. The seed is the ciphertext; nothing here
 // is secret except through that.
 type storedKey struct {
-	Version      int    `json:"version"`
+	Version int `json:"version"`
+	// Kind distinguishes a signing key from opaque secret material sharing the
+	// same directory. Without it a 32-byte secret reads back as a valid signing
+	// key — it decrypts, it is the right length, and nothing complains.
+	Kind         string `json:"kind"`
 	Name         string `json:"name"`
 	Transferable bool   `json:"transferable"`
 	Nonce        string `json:"nonce"`
@@ -165,6 +172,7 @@ func (f *FileKeyStore) Generate(name string, transferable bool) (Signer, error) 
 
 	record := storedKey{
 		Version:      keyFileVersion,
+		Kind:         keyKind,
 		Name:         name,
 		Transferable: transferable,
 		Nonce:        base64.RawURLEncoding.EncodeToString(nonce),
@@ -216,6 +224,10 @@ func (f *FileKeyStore) Signer(name string) (Signer, error) {
 	var record storedKey
 	if err := json.Unmarshal(body, &record); err != nil {
 		return nil, fmt.Errorf("the key file for %q is not readable: %w", name, err)
+	}
+	if record.Kind != keyKind {
+		return nil, fmt.Errorf("%q holds %s material, not a signing key; read it with "+
+			"Secret", name, record.Kind)
 	}
 	if record.Version != keyFileVersion {
 		return nil, fmt.Errorf("the key file for %q is version %d and this build "+
