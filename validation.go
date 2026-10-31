@@ -452,9 +452,9 @@ func ParseEvent(raw []byte) (*Event, error) {
 			if !ok {
 				return nil, fmt.Errorf("the sequence number is not a string")
 			}
-			n, perr := strconv.ParseUint(s, 16, 64)
+			n, perr := canonicalHex(s)
 			if perr != nil {
-				return nil, fmt.Errorf("sequence number %q is not lowercase hexadecimal", s)
+				return nil, fmt.Errorf("sequence number: %w", perr)
 			}
 			ev.SN = n
 		case "k":
@@ -468,22 +468,49 @@ func ParseEvent(raw []byte) (*Event, error) {
 		case "ba":
 			ev.WitnessAdd, _ = jsonStrings(f.Value)
 		case "bt":
+			// Refused rather than skipped. An unreadable witness threshold
+			// left absent reads as "no threshold stated", and a reader that
+			// inherits the previous one, which is zero at inception, would
+			// take an event as witnessed that no witness has receipted.
 			s, ok := jsonString(f.Value)
-			if ok {
-				if n, perr := strconv.ParseUint(s, 16, 64); perr == nil {
-					ev.TOAD, ev.HasTOAD = n, true
-				}
+			if !ok {
+				return nil, fmt.Errorf("the witness threshold is not a string")
 			}
+			n, perr := canonicalHex(s)
+			if perr != nil {
+				return nil, fmt.Errorf("witness threshold: %w", perr)
+			}
+			ev.TOAD, ev.HasTOAD = n, true
 		case "kt":
-			ev.SigThreshold, _ = parseThreshold(f.Value)
+			t, perr := parseThreshold(f.Value)
+			if perr != nil {
+				return nil, fmt.Errorf("signing threshold: %w", perr)
+			}
+			ev.SigThreshold = t
 		case "nt":
-			ev.NextThreshold, _ = parseThreshold(f.Value)
+			t, perr := parseThreshold(f.Value)
+			if perr != nil {
+				return nil, fmt.Errorf("next-key threshold: %w", perr)
+			}
+			ev.NextThreshold = t
 		}
 	}
 	if ev.Ilk == "" {
 		return nil, fmt.Errorf("the event does not say what type it is")
 	}
 	return ev, nil
+}
+
+// canonicalHex reads a count written as KERI writes one: lowercase
+// hexadecimal with no leading zeros, "0" itself included. strconv alone also
+// takes uppercase digits and leading zeros, so "a", "A" and "0a" would be one
+// number spelled three ways; only the first is read.
+func canonicalHex(s string) (uint64, error) {
+	n, err := strconv.ParseUint(s, 16, 64)
+	if err != nil || strconv.FormatUint(n, 16) != s {
+		return 0, fmt.Errorf("%q is not a count in lowercase hexadecimal without leading zeros", s)
+	}
+	return n, nil
 }
 
 func jsonString(raw []byte) (string, bool) {
@@ -581,9 +608,9 @@ type fraction struct{ num, den uint64 }
 // for a ten-key identity "a" and "10" are different thresholds.
 func parseThreshold(raw []byte) (*parsedThreshold, error) {
 	if s, ok := jsonString(raw); ok {
-		n, err := strconv.ParseUint(s, 16, 64)
+		n, err := canonicalHex(s)
 		if err != nil {
-			return nil, fmt.Errorf("parsedThreshold %q is not a hexadecimal count", s)
+			return nil, err
 		}
 		return &parsedThreshold{count: n}, nil
 	}

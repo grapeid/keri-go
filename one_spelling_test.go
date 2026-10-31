@@ -225,3 +225,47 @@ func TestARegistryNamingOneBackerTwiceIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A count — sequence number, witness threshold, signing and next-key
+// threshold — is read only as KERI writes it: lowercase hex, no leading zeros.
+// An unreadable witness threshold used to be dropped silently, which reads as
+// "none stated".
+func TestACountHasOneSpelling(t *testing.T) {
+	w1 := mustPub(t, mustSigner(t, 'w', false))
+	w2 := mustPub(t, mustSigner(t, 'x', false))
+	ctrl := mustSigner(t, 'c', true)
+	icp, err := BuildInception(InceptionInput{
+		Keys: []string{mustPub(t, ctrl)}, NextDigests: []string{mustDigestOf(t, ctrl)},
+		Witnesses: []string{w1, w2}, Toad: intPointer(2),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ev, err := ParseEvent(icp); err != nil || !ev.HasTOAD || ev.TOAD != 2 {
+		t.Fatalf("the canonical event did not parse: %v", err)
+	}
+	for _, c := range []struct{ from, to string }{
+		{`"bt":"2"`, `"bt":"02"`},
+		{`"bt":"2"`, `"bt":"x"`},
+		{`"bt":"2"`, `"bt":2`},
+		{`"s":"0"`, `"s":"00"`},
+		{`"kt":"1"`, `"kt":"01"`},
+		{`"nt":"1"`, `"nt":"01"`},
+	} {
+		if !bytes.Contains(icp, []byte(c.from)) {
+			t.Fatalf("the event has no %s to respell", c.from)
+		}
+		other := bytes.Replace(icp, []byte(c.from), []byte(c.to), 1)
+		if _, err := ParseEvent(other); err == nil {
+			t.Errorf("an event with %s parsed", c.to)
+		}
+	}
+	if n, err := canonicalHex("a"); err != nil || n != 10 {
+		t.Errorf("a read as %d (%v)", n, err)
+	}
+	for _, s := range []string{"A", "0a", "", "-1", "+1"} {
+		if _, err := canonicalHex(s); err == nil {
+			t.Errorf("%q was read as a count", s)
+		}
+	}
+}
