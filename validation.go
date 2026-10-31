@@ -87,8 +87,10 @@ const (
 	// FaultKeyNotPrecommitted is a rotation presenting a key the previous
 	// establishment event did not commit to.
 	FaultKeyNotPrecommitted FaultKind = "key-not-precommitted"
-	// FaultWitnessListInvalid is a rotation cutting a witness that is not
-	// there, or adding one that already is.
+	// FaultWitnessListInvalid is a witness list that cannot be right: a
+	// rotation cutting a witness that is not there or adding one that already
+	// is, an entry that is not a canonical non-transferable identifier, or one
+	// witness named twice.
 	FaultWitnessListInvalid FaultKind = "witness-list-invalid"
 	// FaultReceiptSignature is a receipt whose signature does not verify —
 	// including one whose signature or signer cannot be read at all, since in
@@ -775,6 +777,7 @@ func validateEvent(fs *faults, raw []byte) *Event {
 		checkDerivation(fs, ev)
 	}
 	checkThresholds(fs, ev)
+	checkWitnessIdentifiers(fs, ev)
 	return ev
 }
 
@@ -1072,6 +1075,43 @@ func checkPrecommitment(fs *faults, ev *Event, committed []string, th *parsedThr
 		fs.add(FaultKeyNotPrecommitted, "the keys presented satisfy only %d of the committed "+
 			"next keys, which does not meet the parsedThreshold the previous event set", len(used))
 	}
+}
+
+// checkWitnessIdentifiers holds each witness list an event names to two rules:
+// every entry is a non-transferable identifier in its one canonical spelling,
+// and no witness is named twice, judged by its key rather than its text.
+//
+// A witness is counted toward the threshold, so one that can be named two ways
+// can be counted twice. Comparing text alone does not stop that: two spellings
+// of one key are different strings. Requiring the canonical spelling means each
+// key has one string, and comparing keys says so outright.
+//
+// This refuses an event that names any other kind of witness — a transferable
+// key, or a key on another curve — which used to validate with that witness's
+// receipts simply never counted. A witness must be non-transferable, so a
+// receipt can be checked from its identifier alone, and Ed25519 is the only
+// curve this package verifies; an event whose witnesses can never be counted
+// is refused rather than accepted with a threshold it cannot meet.
+func checkWitnessIdentifiers(fs *faults, ev *Event) {
+	lists := []struct {
+		field string
+		names []string
+	}{{"b", ev.Witnesses}, {"br", ev.WitnessCut}, {"ba", ev.WitnessAdd}}
+	for _, l := range lists {
+		if err := noDuplicateWitnesses(l.names); err != nil {
+			fs.add(FaultWitnessListInvalid, "%s: %v", l.field, err)
+		}
+	}
+}
+
+// witnessKey is the key a witness identifier is made of, as a map key: the
+// form in which two names for one witness are equal.
+func witnessKey(aid string) (string, error) {
+	pub, err := MatterRaw(CodeEd25519N, aid, ed25519.PublicKeySize)
+	if err != nil {
+		return "", err
+	}
+	return string(pub), nil
 }
 
 func checkWitnessChange(fs *faults, ev *Event, current []string) {
@@ -1529,19 +1569,21 @@ func ReceiptsMeetThreshold(stream []byte, event []byte, designated []string) (co
 			continue
 		}
 		for _, couple := range g.Couples {
-			if !allowed[couple.Signer] || counted[couple.Signer] {
+			if !allowed[couple.Signer] {
 				continue
 			}
 			pub, err := MatterRaw(CodeEd25519N, couple.Signer, ed25519.PublicKeySize)
-			if err != nil {
+			if err != nil || counted[string(pub)] {
 				continue
 			}
 			sig, err := MatterRaw(CodeEd25519Sig, couple.Sig, ed25519.SignatureSize)
 			if err != nil {
 				continue
 			}
+			// Counted by key, not by text, so one witness is one vote however
+			// it is written.
 			if ed25519.Verify(pub, ev.Raw, sig) {
-				counted[couple.Signer] = true
+				counted[string(pub)] = true
 			}
 		}
 	}

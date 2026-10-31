@@ -3,6 +3,7 @@ package keri
 import (
 	"bytes"
 	"crypto/ed25519"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -142,5 +143,61 @@ func TestARespelledControllerSignatureIsRefused(t *testing.T) {
 		if _, err := ValidateSignedKEL([][]byte{[]byte(other)}); err == nil {
 			t.Errorf("the signature respelled with lead bits %d still verified", k)
 		}
+	}
+}
+
+// One witness written two ways is still one witness.
+func TestAWitnessUnderTwoSpellingsIsOneWitness(t *testing.T) {
+	w1 := mustSigner(t, 'w', false)
+	w2 := mustSigner(t, 'x', false)
+	ctrl := mustSigner(t, 'c', true)
+	canonical := mustPub(t, w1)
+	other := respell(t, canonical, 1, 1)
+
+	// Building refuses it.
+	if _, err := BuildInception(InceptionInput{
+		Keys: []string{mustPub(t, ctrl)}, NextDigests: []string{mustDigestOf(t, ctrl)},
+		Witnesses: []string{canonical, other}, Toad: intPointer(2),
+	}); err == nil {
+		t.Error("an inception naming one witness under two spellings was built")
+	}
+
+	// Counting refuses it. The event designates two real witnesses with a
+	// threshold of two; the caller's designated list names the first witness
+	// twice, and only the first witness signs.
+	icp, err := BuildInception(InceptionInput{
+		Keys: []string{mustPub(t, ctrl)}, NextDigests: []string{mustDigestOf(t, ctrl)},
+		Witnesses: []string{canonical, mustPub(t, w2)}, Toad: intPointer(2),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev, _ := ParseEvent(icp)
+	s, err := w1.Sign(icp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cigar, _ := MatterQB64(CodeEd25519Sig, s)
+	receipt, err := BuildReceiptStream(ReceiptInput{Prefix: ev.Identifier, SN: 0, EventSAID: ev.SAID},
+		[]ReceiptCouple{{Witness: canonical, CigarQB64: cigar}, {Witness: other, CigarQB64: cigar}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	count, met, err := ReceiptsMeetThreshold(receipt, icp, []string{canonical, other})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 || met {
+		t.Errorf("one witness under two spellings counted %d times (met=%v), want once", count, met)
+	}
+
+	// Validation refuses it: the same event with its second witness replaced
+	// by the first one's other spelling.
+	forged := bytes.Replace(icp, []byte(mustPub(t, w2)), []byte(other), 1)
+	err = ValidateEvent(forged)
+	var ve *ValidationError
+	if !errors.As(err, &ve) || !ve.Has(FaultWitnessListInvalid) {
+		t.Errorf("an event naming one witness under two spellings was not refused for its "+
+			"witness list: %v", err)
 	}
 }

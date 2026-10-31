@@ -97,7 +97,7 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 	if err := noDuplicates(in.Keys, "signing key"); err != nil {
 		return nil, err
 	}
-	if err := noDuplicates(in.Witnesses, "witness"); err != nil {
+	if err := noDuplicateWitnesses(in.Witnesses); err != nil {
 		return nil, err
 	}
 
@@ -435,6 +435,29 @@ func noDuplicates(values []string, what string) error {
 				"signature count as two", what, v)
 		}
 		seen[v] = true
+	}
+	return nil
+}
+
+// noDuplicateWitnesses refuses a witness list with an entry that is not a
+// canonical non-transferable identifier, or with one witness named twice.
+//
+// Compared by key rather than by text. Each key has one canonical spelling, so
+// requiring that spelling already makes the two agree; comparing keys says so
+// outright, and does not depend on it.
+func noDuplicateWitnesses(witnesses []string) error {
+	seen := make(map[string]string, len(witnesses))
+	for _, w := range witnesses {
+		key, err := witnessKey(w)
+		if err != nil {
+			return fmt.Errorf("the witness %q is not a readable non-transferable "+
+				"identifier: %w", w, err)
+		}
+		if first, dup := seen[key]; dup {
+			return fmt.Errorf("the same witness is listed twice (%s and %s), which would "+
+				"let one signature count as two", first, w)
+		}
+		seen[key] = w
 	}
 	return nil
 }

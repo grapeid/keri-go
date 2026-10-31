@@ -258,12 +258,16 @@ func rotWitnesses(prior, cuts, adds []string, toad *int) ([]string, []string, in
 // A duplicate is rejected rather than collapsed: "add this witness twice" is
 // not a request with an obvious meaning, and quietly making it mean "once"
 // leaves the caller believing something the event does not say.
+//
+// Every entry must be a canonical non-transferable identifier. Membership is
+// then tested by text, which is sound only because each key has exactly one
+// canonical string; the duplicate check compares keys regardless.
 func rotSet(items []string) (map[string]bool, error) {
+	if err := noDuplicateWitnesses(items); err != nil {
+		return nil, err
+	}
 	set := make(map[string]bool, len(items))
 	for _, it := range items {
-		if set[it] {
-			return nil, fmt.Errorf("names %s twice", it)
-		}
 		set[it] = true
 	}
 	return set, nil
