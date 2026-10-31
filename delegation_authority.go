@@ -3,7 +3,6 @@ package keri
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 )
 
 // Whether a delegation was actually authorised.
@@ -69,10 +68,9 @@ func (e *Event) Seals() ([]Seal, error) {
 			// legitimately anchors other things.
 			continue
 		}
-		sn, err := strconv.ParseUint(w.S, 16, 64)
+		sn, err := canonicalHex(w.S)
 		if err != nil {
-			return nil, fmt.Errorf("a seal for %s has sequence number %q, which is not "+
-				"hexadecimal", w.I, w.S)
+			return nil, fmt.Errorf("a seal for %s has an unreadable sequence number: %w", w.I, err)
 		}
 		out = append(out, Seal{Identifier: w.I, SN: sn, SAID: w.D})
 	}

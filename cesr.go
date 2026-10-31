@@ -69,24 +69,70 @@ func MatterQB64(code string, raw []byte) (string, error) {
 // The code is checked rather than skipped. Values of different types are the
 // same shape once the prefix is removed, so decoding one without checking what
 // it claims to be is how a digest gets read as a key.
+//
+// It reads only the canonical spelling, so each value has exactly one string.
+// That matters wherever a value is compared or counted as text — an identifier
+// is a key, a witness is counted once — and a reader that accepts a second
+// spelling of the same bytes lets one party appear as two. Three things would
+// otherwise give a value more than one string:
+//
+//   - the lead bits. The code stands in for the lead bytes, but a code
+//     character carries 6 bits and a lead byte 8, so the character after the
+//     code carries the rest of the lead bytes. Unchecked, a one-character code
+//     gave every value 4 spellings and a two-character code 16;
+//   - characters outside base64url. The standard decoder skips line breaks,
+//     so a value with one inserted read as the same bytes;
+//   - the length. A qb64 value is always a whole number of four-character
+//     groups, and exactly as long as its code and size make it.
 func MatterRaw(code, qb64 string, expectLen int) ([]byte, error) {
-	if len(qb64) < len(code) || qb64[:len(code)] != code {
+	if code == "" || len(qb64) < len(code) || qb64[:len(code)] != code {
 		return nil, fmt.Errorf("expected a %q value, got one starting %.4q", code, qb64)
 	}
+	if len(qb64)%4 != 0 {
+		return nil, fmt.Errorf("%q value is %d characters, not a whole number of "+
+			"four-character groups, so it is not qb64", code, len(qb64))
+	}
+	if !isBase64URL(qb64[len(code):]) {
+		return nil, fmt.Errorf("%q value has a character outside base64url, so it is not qb64", code)
+	}
 	pad := len(code) % 4
-	decoded, err := base64.RawURLEncoding.DecodeString(
-		string(make([]byte, 0, pad)) + padChars(pad) + qb64[len(code):])
+	if expectLen > 0 {
+		if want := len(code) - pad + (pad+expectLen)*4/3; (pad+expectLen)%3 != 0 || len(qb64) != want {
+			return nil, fmt.Errorf("a %q value of %d bytes is %d characters, this one is %d",
+				code, expectLen, want, len(qb64))
+		}
+	}
+	decoded, err := base64.RawURLEncoding.Strict().DecodeString(padChars(pad) + qb64[len(code):])
 	if err != nil {
 		return nil, fmt.Errorf("%q value is not valid base64url: %w", code, err)
 	}
 	if len(decoded) < pad {
 		return nil, fmt.Errorf("%q value is too short to hold anything", code)
 	}
+	for _, b := range decoded[:pad] {
+		if b != 0 {
+			return nil, fmt.Errorf("%q value's lead bits are not zero, so it is not "+
+				"the canonical spelling of any value", code)
+		}
+	}
 	raw := decoded[pad:]
 	if expectLen > 0 && len(raw) != expectLen {
 		return nil, fmt.Errorf("expected %d bytes for a %q value, got %d", expectLen, code, len(raw))
 	}
 	return raw, nil
+}
+
+// isBase64URL reports whether every character of s is in the base64url
+// alphabet, the only one qb64 uses. Padding is not in it, and nor are the line
+// breaks the standard decoder would otherwise skip.
+func isBase64URL(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 func padChars(n int) string {

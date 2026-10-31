@@ -87,8 +87,10 @@ const (
 	// FaultKeyNotPrecommitted is a rotation presenting a key the previous
 	// establishment event did not commit to.
 	FaultKeyNotPrecommitted FaultKind = "key-not-precommitted"
-	// FaultWitnessListInvalid is a rotation cutting a witness that is not
-	// there, or adding one that already is.
+	// FaultWitnessListInvalid is a witness list that cannot be right: a
+	// rotation cutting a witness that is not there or adding one that already
+	// is, an entry that is not a canonical non-transferable identifier, or one
+	// witness named twice.
 	FaultWitnessListInvalid FaultKind = "witness-list-invalid"
 	// FaultReceiptSignature is a receipt whose signature does not verify —
 	// including one whose signature or signer cannot be read at all, since in
@@ -450,9 +452,9 @@ func ParseEvent(raw []byte) (*Event, error) {
 			if !ok {
 				return nil, fmt.Errorf("the sequence number is not a string")
 			}
-			n, perr := strconv.ParseUint(s, 16, 64)
+			n, perr := canonicalHex(s)
 			if perr != nil {
-				return nil, fmt.Errorf("sequence number %q is not lowercase hexadecimal", s)
+				return nil, fmt.Errorf("sequence number: %w", perr)
 			}
 			ev.SN = n
 		case "k":
@@ -466,22 +468,49 @@ func ParseEvent(raw []byte) (*Event, error) {
 		case "ba":
 			ev.WitnessAdd, _ = jsonStrings(f.Value)
 		case "bt":
+			// Refused rather than skipped. An unreadable witness threshold
+			// left absent reads as "no threshold stated", and a reader that
+			// inherits the previous one, which is zero at inception, would
+			// take an event as witnessed that no witness has receipted.
 			s, ok := jsonString(f.Value)
-			if ok {
-				if n, perr := strconv.ParseUint(s, 16, 64); perr == nil {
-					ev.TOAD, ev.HasTOAD = n, true
-				}
+			if !ok {
+				return nil, fmt.Errorf("the witness threshold is not a string")
 			}
+			n, perr := canonicalHex(s)
+			if perr != nil {
+				return nil, fmt.Errorf("witness threshold: %w", perr)
+			}
+			ev.TOAD, ev.HasTOAD = n, true
 		case "kt":
-			ev.SigThreshold, _ = parseThreshold(f.Value)
+			t, perr := parseThreshold(f.Value)
+			if perr != nil {
+				return nil, fmt.Errorf("signing threshold: %w", perr)
+			}
+			ev.SigThreshold = t
 		case "nt":
-			ev.NextThreshold, _ = parseThreshold(f.Value)
+			t, perr := parseThreshold(f.Value)
+			if perr != nil {
+				return nil, fmt.Errorf("next-key threshold: %w", perr)
+			}
+			ev.NextThreshold = t
 		}
 	}
 	if ev.Ilk == "" {
 		return nil, fmt.Errorf("the event does not say what type it is")
 	}
 	return ev, nil
+}
+
+// canonicalHex reads a count written as KERI writes one: lowercase
+// hexadecimal with no leading zeros, "0" itself included. strconv alone also
+// takes uppercase digits and leading zeros, so "a", "A" and "0a" would be one
+// number spelled three ways; only the first is read.
+func canonicalHex(s string) (uint64, error) {
+	n, err := strconv.ParseUint(s, 16, 64)
+	if err != nil || strconv.FormatUint(n, 16) != s {
+		return 0, fmt.Errorf("%q is not a count in lowercase hexadecimal without leading zeros", s)
+	}
+	return n, nil
 }
 
 func jsonString(raw []byte) (string, bool) {
@@ -579,9 +608,9 @@ type fraction struct{ num, den uint64 }
 // for a ten-key identity "a" and "10" are different thresholds.
 func parseThreshold(raw []byte) (*parsedThreshold, error) {
 	if s, ok := jsonString(raw); ok {
-		n, err := strconv.ParseUint(s, 16, 64)
+		n, err := canonicalHex(s)
 		if err != nil {
-			return nil, fmt.Errorf("parsedThreshold %q is not a hexadecimal count", s)
+			return nil, err
 		}
 		return &parsedThreshold{count: n}, nil
 	}
@@ -775,6 +804,7 @@ func validateEvent(fs *faults, raw []byte) *Event {
 		checkDerivation(fs, ev)
 	}
 	checkThresholds(fs, ev)
+	checkWitnessIdentifiers(fs, ev)
 	return ev
 }
 
@@ -1072,6 +1102,43 @@ func checkPrecommitment(fs *faults, ev *Event, committed []string, th *parsedThr
 		fs.add(FaultKeyNotPrecommitted, "the keys presented satisfy only %d of the committed "+
 			"next keys, which does not meet the parsedThreshold the previous event set", len(used))
 	}
+}
+
+// checkWitnessIdentifiers holds each witness list an event names to two rules:
+// every entry is a non-transferable identifier in its one canonical spelling,
+// and no witness is named twice, judged by its key rather than its text.
+//
+// A witness is counted toward the threshold, so one that can be named two ways
+// can be counted twice. Comparing text alone does not stop that: two spellings
+// of one key are different strings. Requiring the canonical spelling means each
+// key has one string, and comparing keys says so outright.
+//
+// This refuses an event that names any other kind of witness — a transferable
+// key, or a key on another curve — which used to validate with that witness's
+// receipts simply never counted. A witness must be non-transferable, so a
+// receipt can be checked from its identifier alone, and Ed25519 is the only
+// curve this package verifies; an event whose witnesses can never be counted
+// is refused rather than accepted with a threshold it cannot meet.
+func checkWitnessIdentifiers(fs *faults, ev *Event) {
+	lists := []struct {
+		field string
+		names []string
+	}{{"b", ev.Witnesses}, {"br", ev.WitnessCut}, {"ba", ev.WitnessAdd}}
+	for _, l := range lists {
+		if err := noDuplicateWitnesses(l.names, "witness"); err != nil {
+			fs.add(FaultWitnessListInvalid, "%s: %v", l.field, err)
+		}
+	}
+}
+
+// witnessKey is the key a witness identifier is made of, as a map key: the
+// form in which two names for one witness are equal.
+func witnessKey(aid string) (string, error) {
+	pub, err := MatterRaw(CodeEd25519N, aid, ed25519.PublicKeySize)
+	if err != nil {
+		return "", err
+	}
+	return string(pub), nil
 }
 
 func checkWitnessChange(fs *faults, ev *Event, current []string) {
@@ -1529,19 +1596,21 @@ func ReceiptsMeetThreshold(stream []byte, event []byte, designated []string) (co
 			continue
 		}
 		for _, couple := range g.Couples {
-			if !allowed[couple.Signer] || counted[couple.Signer] {
+			if !allowed[couple.Signer] {
 				continue
 			}
 			pub, err := MatterRaw(CodeEd25519N, couple.Signer, ed25519.PublicKeySize)
-			if err != nil {
+			if err != nil || counted[string(pub)] {
 				continue
 			}
 			sig, err := MatterRaw(CodeEd25519Sig, couple.Sig, ed25519.SignatureSize)
 			if err != nil {
 				continue
 			}
+			// Counted by key, not by text, so one witness is one vote however
+			// it is written.
 			if ed25519.Verify(pub, ev.Raw, sig) {
-				counted[couple.Signer] = true
+				counted[string(pub)] = true
 			}
 		}
 	}
