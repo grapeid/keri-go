@@ -1098,7 +1098,7 @@ func checkWitnessIdentifiers(fs *faults, ev *Event) {
 		names []string
 	}{{"b", ev.Witnesses}, {"br", ev.WitnessCut}, {"ba", ev.WitnessAdd}}
 	for _, l := range lists {
-		if err := noDuplicateWitnesses(l.names); err != nil {
+		if err := noDuplicateWitnesses(l.names, "witness"); err != nil {
 			fs.add(FaultWitnessListInvalid, "%s: %v", l.field, err)
 		}
 	}

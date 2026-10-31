@@ -263,7 +263,7 @@ func rotWitnesses(prior, cuts, adds []string, toad *int) ([]string, []string, in
 // then tested by text, which is sound only because each key has exactly one
 // canonical string; the duplicate check compares keys regardless.
 func rotSet(items []string) (map[string]bool, error) {
-	if err := noDuplicateWitnesses(items); err != nil {
+	if err := noDuplicateWitnesses(items, "witness"); err != nil {
 		return nil, err
 	}
 	set := make(map[string]bool, len(items))

@@ -201,3 +201,27 @@ func TestAWitnessUnderTwoSpellingsIsOneWitness(t *testing.T) {
 			"witness list: %v", err)
 	}
 }
+
+// A registry backer is counted as a witness is, so one named twice — under the
+// same string or under two spellings of its key — is refused.
+func TestARegistryNamingOneBackerTwiceIsRefused(t *testing.T) {
+	b1 := mustPub(t, mustSigner(t, 'w', false))
+	b2 := mustPub(t, mustSigner(t, 'x', false))
+	issuer := "EIl6QsmXv4xyHWtFZl9q3sLVS-16_dAXptWGIZT6FUs4"
+	ok := RegistryInput{Issuer: issuer, Nonce: "0AAxyz", Backers: []string{b1, b2}, Toad: 2}
+	if _, err := BuildRegistryInception(ok); err != nil {
+		t.Fatalf("a registry with two distinct backers was refused: %v", err)
+	}
+	for name, backers := range map[string][]string{
+		"same string":    {b1, b1},
+		"two spellings":  {b1, respell(t, b1, 1, 2)},
+		"not a backer":   {b1, "D" + b2[1:]},
+		"respelled only": {respell(t, b1, 1, 1), b2},
+	} {
+		in := ok
+		in.Backers = backers
+		if _, err := BuildRegistryInception(in); err == nil {
+			t.Errorf("%s: a registry naming backers %v was built", name, backers)
+		}
+	}
+}

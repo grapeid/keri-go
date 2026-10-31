@@ -220,7 +220,7 @@ func BuildDelegatedInception(in DelegationInput) ([]byte, error) {
 	if err := noDuplicates(in.Keys, "signing key"); err != nil {
 		return nil, err
 	}
-	if err := noDuplicateWitnesses(in.Witnesses); err != nil {
+	if err := noDuplicateWitnesses(in.Witnesses, "witness"); err != nil {
 		return nil, err
 	}
 

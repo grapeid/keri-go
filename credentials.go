@@ -394,6 +394,11 @@ func BuildRegistryInception(in RegistryInput) ([]byte, error) {
 		// nil would serialise as null; the absence of backers is an empty list.
 		backers = []string{}
 	}
+	// A backer is counted toward the threshold as a witness is, so it is held
+	// to the same rule: a canonical non-transferable identifier, named once.
+	if err := noDuplicateWitnesses(backers, "backer"); err != nil {
+		return nil, err
+	}
 	if len(backers) == 0 && in.Toad != 0 {
 		return nil, fmt.Errorf("a registry with no backers cannot require %d of them", in.Toad)
 	}
