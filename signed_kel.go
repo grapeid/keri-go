@@ -90,6 +90,10 @@ func (r *SignedKELResult) FullyWitnessed() bool {
 //
 // The difference matters most for interaction events, which carry no keys and
 // were previously not signature-checked at all.
+//
+// Witnessing is reported in the result's Witnessing and not enforced, so a nil
+// error means the log is correctly controller-signed, not that it is fully
+// witnessed; ask FullyWitnessed for that.
 func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 	if len(messages) == 0 {
 		return nil, fmt.Errorf("an empty log establishes no identity")
@@ -337,6 +341,8 @@ func countWitnessSignatures(ev *Event, groups []attachment, witnesses []string,
 				w.Dropped++
 				continue
 			}
+			// byKey is defence in depth: checkWitnessIdentifiers already makes
+			// each place a different key, so a place is never a second vote.
 			if signed[sig.Index] || byKey[key] {
 				continue // the same witness again is the same witness
 			}

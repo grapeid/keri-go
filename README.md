@@ -139,8 +139,9 @@ two-key signing or prior-next threshold alone. The same holds for a witness
 signing as A0 and B0 against a witness threshold of two. keripy also accepts a
 key list that names one key twice (`k = [a, a]`, or `n = [H(c), H(c)]`), which
 lets that key count at both places. keri-go counts each place and each witness
-once, refuses any establishment event that repeats a key or digest, and refuses
-those logs.
+once and refuses any establishment event that repeats a key or digest. It
+refuses the key and digest cases outright, and reports the re-encoded witness
+case as not fully witnessed.
 
 `ValidateSignedKEL` reports each event's witness-indexed signatures in
 `Witnessing`, counted against the witness list in force for that event, and
