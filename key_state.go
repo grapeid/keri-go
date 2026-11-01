@@ -188,23 +188,54 @@ func advance(fs *faults, prev *KeyState, ev *Event, groups []attachment,
 		return step{state: st, witnessing: w}
 	}
 	verified := verifyAgainstKeyState(fs, ev, groups, st.keys, st.threshold)
+	var committed []string
 	if rotation {
-		var committed []string
 		var th *parsedThreshold
 		if prev != nil {
 			committed, th = prev.next, prev.nextThreshold
 		}
 		checkPriorNextOpened(fs, ev, verified, committed, th)
 	}
-	return step{state: st, witnessing: w, signatures: signatureTexts(verified)}
+	return step{state: st, witnessing: w, signatures: onePerKey(ev, verified, committed)}
 }
 
-func signatureTexts(sigs []indexedSig) []string {
-	out := make([]string, 0, len(sigs))
-	for _, sig := range sigs {
-		out = append(out, sig.QB64)
+// onePerKey is one verified signature for each key that signed, as attached.
+//
+// One signature can be written many ways: the prior-next place a 2A form names
+// is not covered by the signature, so each key's one signature has thousands of
+// spellings that all verify. Reporting each would let anyone holding one
+// public signature hand a keeper of signatures as many copies as it will
+// store. Where a rotation's key opens a commitment, the spelling that opens it
+// is the one kept, so the signatures reported still authorise what they did.
+func onePerKey(ev *Event, verified []indexedSig, committed []string) []string {
+	chosen := make(map[int]indexedSig)
+	var order []int
+	for _, sig := range verified {
+		have, ok := chosen[sig.Index]
+		if !ok {
+			order = append(order, sig.Index)
+			chosen[sig.Index] = sig
+			continue
+		}
+		if !opens(ev, have, committed) && opens(ev, sig, committed) {
+			chosen[sig.Index] = sig
+		}
+	}
+	out := make([]string, 0, len(order))
+	for _, i := range order {
+		out = append(out, chosen[i].QB64)
 	}
 	return out
+}
+
+// opens is whether sig opens the commitment at the prior-next place it names.
+func opens(ev *Event, sig indexedSig, committed []string) bool {
+	if !sig.HasOndex || sig.Ondex < 0 || sig.Ondex >= len(committed) ||
+		sig.Index < 0 || sig.Index >= len(ev.Keys) {
+		return false
+	}
+	digest, err := Blake3SAID([]byte(ev.Keys[sig.Index]))
+	return err == nil && digest == committed[sig.Ondex]
 }
 
 // Verified is one event verified against the key state it follows.
@@ -214,8 +245,10 @@ type Verified struct {
 	// Witnessing is what the event's witness-indexed signatures establish.
 	// It is reported and not enforced, as in ValidateSignedKEL.
 	Witnessing EventWitnessing
-	// Signatures are the attached controller signatures that verified, each
-	// once, as attached. One that did not verify is not among them.
+	// Signatures are the attached controller signatures that verified, one
+	// for each key that signed, as attached: where a rotation's key opens a
+	// commitment, the spelling that opens it. One that did not verify is not
+	// among them, and nor is a second spelling of one key's signature.
 	Signatures []string
 }
 
@@ -406,7 +439,7 @@ func (r *SignedKELResult) repeat(fs *faults, ev *Event, groups []attachment,
 	}
 	return &Admission{
 		Verified: Verified{State: held, Witnessing: w,
-			Signatures: signatureTexts(verified)},
+			Signatures: onePerKey(ev, verified, nil)},
 		Repeat: true, Log: r.withWitnesses(held.sn, w),
 	}, nil
 }

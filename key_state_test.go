@@ -532,3 +532,66 @@ func TestLateWitnessSignaturesAreCountedInTheLog(t *testing.T) {
 		t.Error("admitting a repeat changed the log it was admitted to")
 	}
 }
+
+// One signature written many ways is reported once, and for a rotation in the
+// spelling that opens the commitment, so a keeper storing what is reported
+// cannot be handed thousands of copies.
+func TestOneKeysSignatureIsReportedOnceHoweverItIsSpelled(t *testing.T) {
+	a, e := newRotKey(t, 'a'), newRotKey(t, 'e')
+	icp, err := BuildInception(InceptionInput{Keys: pubsOf(a), NextDigests: digestsOf(e)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	icpEv, err := ParseEvent(icp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spellings []placedSig
+	spellings = append(spellings, placedSig{key: a, code: "A", index: 0},
+		placedSig{key: a, code: "B", index: 0})
+	for ondex := 1; ondex < 40; ondex++ {
+		spellings = append(spellings, placedSig{key: a, code: "2A", index: 0, ondex: ondex})
+	}
+	v, err := VerifyEvent(nil, handMessage(t, icp, spellings...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v.Signatures) != 1 {
+		t.Fatalf("one key's signature was reported %d times", len(v.Signatures))
+	}
+
+	rot, err := BuildRotation(RotationInput{Prefix: icpEv.Identifier, Keys: pubsOf(e),
+		PriorSAID: icpEv.SAID, SN: 1, NextDigests: digestsOf(a)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := ValidateSignedKEL([][]byte{handMessage(t, icp, placedSig{key: a, code: "A", index: 0})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	adm, err := r.Admit(handMessage(t, rot,
+		placedSig{key: e, code: "2A", index: 0, ondex: 5},
+		placedSig{key: e, code: "A", index: 0}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(adm.Signatures) != 1 {
+		t.Fatalf("the rotation reported %d signatures", len(adm.Signatures))
+	}
+	again, err := ValidateSignedKEL([][]byte{
+		handMessage(t, icp, placedSig{key: a, code: "A", index: 0}),
+		append(append([]byte(nil), rot...), mustGroup(t, adm.Signatures)...)})
+	if err != nil {
+		t.Fatalf("the signature reported for the rotation no longer authorises it: %v", err)
+	}
+	_ = again
+}
+
+func mustGroup(t *testing.T, sigs []string) []byte {
+	t.Helper()
+	g, err := AttachControllerSigs(sigs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return g
+}
