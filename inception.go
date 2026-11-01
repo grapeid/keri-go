@@ -92,7 +92,7 @@ func BuildInception(in InceptionInput) ([]byte, error) {
 	if len(in.Keys) == 0 {
 		return nil, fmt.Errorf("an identity must be founded on at least one key")
 	}
-	if err := noDuplicates(in.Keys, "signing key"); err != nil {
+	if err := noRepeatedKeysOrDigests(in.Keys, in.NextDigests); err != nil {
 		return nil, err
 	}
 	if err := noDuplicateWitnesses(in.Witnesses, "witness"); err != nil {
@@ -280,23 +280,6 @@ func checkToad(toad, witnesses int) error {
 	if toad < 1 || toad > witnesses {
 		return fmt.Errorf("toad is %d, which is outside the 1..%d a %d-witness set can "+
 			"satisfy", toad, witnesses, witnesses)
-	}
-	return nil
-}
-
-// noDuplicates refuses a repeated entry.
-//
-// A key listed twice would let one signature count as two against the
-// threshold, which quietly halves the protection the threshold was chosen for.
-// The same holds for a witness against the toad.
-func noDuplicates(values []string, what string) error {
-	seen := make(map[string]bool, len(values))
-	for _, v := range values {
-		if seen[v] {
-			return fmt.Errorf("the same %s is listed twice (%s), which would let one "+
-				"signature count as two", what, v)
-		}
-		seen[v] = true
 	}
 	return nil
 }

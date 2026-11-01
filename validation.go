@@ -93,6 +93,10 @@ const (
 	// is, an entry that is not a canonical non-transferable identifier, or one
 	// witness named twice.
 	FaultWitnessListInvalid FaultKind = "witness-list-invalid"
+	// FaultKeyListInvalid is an establishment event that lists one signing key
+	// twice in k, or one next-key digest twice in n, so that one key could
+	// count twice toward a threshold.
+	FaultKeyListInvalid FaultKind = "key-list-invalid"
 	// FaultReceiptSignature is a receipt whose signature does not verify —
 	// including one whose signature or signer cannot be read at all, since in
 	// neither case has a witness vote been demonstrated.
@@ -634,6 +638,7 @@ func validateEvent(fs *faults, raw []byte) *Event {
 	}
 	checkThresholds(fs, ev)
 	checkWitnessIdentifiers(fs, ev)
+	checkKeyLists(fs, ev)
 	return ev
 }
 

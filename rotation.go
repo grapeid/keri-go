@@ -111,6 +111,9 @@ func BuildRotation(in RotationInput) ([]byte, error) {
 	if nexts == nil {
 		nexts = []string{}
 	}
+	if err := noRepeatedKeysOrDigests(keys, nexts); err != nil {
+		return nil, err
+	}
 
 	// The current threshold defaults to a simple majority of the keys
 	// presented. The next threshold may legitimately be zero — that is how an
