@@ -31,6 +31,53 @@ type SignedKELResult struct {
 	Threshold *parsedThreshold
 	// Events is how many events were verified.
 	Events int
+	// Witnessing holds, for each event in order, what its witness-indexed
+	// signatures (the -B group) establish against the witnesses designated
+	// for it. It is reported rather than enforced: a log whose events are
+	// not yet witnessed enough is still a correctly signed log, and whether
+	// to act on it before its witnesses have signed is the caller's
+	// decision. FullyWitnessed is the usual question to ask of it.
+	Witnessing []EventWitnessing
+}
+
+// EventWitnessing is what one event's witness-indexed signatures establish.
+//
+// A witness-indexed signature names its witness by position in the witness
+// list in force for the event: the inception's b, changed by each rotation's
+// cuts and adds, and carried unchanged across interactions. Each witness counts
+// once however many of its signatures are attached. Ed25519 signatures are
+// deterministic, so a witness's one signature can be re-attached under a
+// second code by anyone holding it; counting signatures rather than witnesses
+// would let one witness meet a threshold of two.
+type EventWitnessing struct {
+	SN  uint64
+	Ilk string
+	// Witnesses is the list the signatures' indexes point into.
+	Witnesses []string
+	// Threshold is the witness threshold (toad) in force for this event.
+	Threshold uint64
+	// Signed lists each witness whose signature verified, once, in the order
+	// of Witnesses.
+	Signed []string
+	// Dropped counts attached witness signatures that attest nothing: one
+	// that does not verify, or names a place outside Witnesses. Like a
+	// controller signature that does not verify, it is dropped rather than
+	// refusing the log, since anyone passing the event along could append it.
+	Dropped int
+	// Met is whether len(Signed) meets Threshold.
+	Met bool
+}
+
+// FullyWitnessed reports whether every event in the log carries signatures
+// from enough of its designated witnesses to meet its witness threshold. An
+// identity with no witnesses is fully witnessed trivially.
+func (r *SignedKELResult) FullyWitnessed() bool {
+	for _, w := range r.Witnessing {
+		if !w.Met {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidateSignedKEL checks a key log whose entries carry their attachments.
@@ -78,7 +125,11 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 		// interaction carries none, so it never changes them.
 		priorNext   []string
 		priorNextTh *parsedThreshold
-		result      SignedKELResult
+		// witnesses and toad are the witness state in force, which a
+		// witness-indexed signature's index points into.
+		witnesses []string
+		toad      uint64
+		result    SignedKELResult
 	)
 
 	for i, raw := range events {
@@ -101,7 +152,15 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 		if ev.Establishment() {
 			keys = ev.Keys
 			threshold = ev.SigThreshold
+			if rotation {
+				witnesses = applyWitnessChange(witnesses, ev)
+			} else {
+				witnesses = append([]string(nil), ev.Witnesses...)
+			}
+			toad = ev.TOAD
 		}
+		result.Witnessing = append(result.Witnessing,
+			countWitnessSignatures(ev, attachments[i], witnesses, toad))
 		if len(keys) == 0 {
 			fs.add(FaultMalformed, "event %d (%s at sn %d) has no key state to check "+
 				"against, because no establishment event preceded it", i, ev.Ilk, ev.SN)
@@ -246,4 +305,49 @@ func checkPriorNextOpened(fs *faults, ev *Event, verified []indexedSig,
 			"threshold it set, so this rotation was not authorised by the committed keys",
 			len(opened), len(committed))
 	}
+}
+
+// countWitnessSignatures judges an event's witness-indexed signatures against
+// the witness list and threshold in force for it.
+//
+// Each witness counts once: by its place in the list, and by its key, which
+// checkWitnessIdentifiers has already made one per place. This is stricter than
+// keripy 1.3.6, which removes only byte-identical signatures before counting,
+// so one witness's signature attached as A0 and again as B0 counts twice there.
+func countWitnessSignatures(ev *Event, groups []attachment, witnesses []string,
+	toad uint64) EventWitnessing {
+
+	w := EventWitnessing{
+		SN: ev.SN, Ilk: ev.Ilk, Threshold: toad,
+		Witnesses: append([]string(nil), witnesses...),
+	}
+	signed := make(map[int]bool)
+	byKey := make(map[string]bool)
+	for _, g := range groups {
+		if g.Counter != counterWitnessIdxSigs {
+			continue
+		}
+		for _, sig := range g.Sigs {
+			if sig.Index < 0 || sig.Index >= len(witnesses) {
+				w.Dropped++
+				continue
+			}
+			key, err := witnessKey(witnesses[sig.Index])
+			if err != nil || !ed25519.Verify(ed25519.PublicKey(key), ev.Raw, sig.Raw) {
+				w.Dropped++
+				continue
+			}
+			if signed[sig.Index] || byKey[key] {
+				continue // the same witness again is the same witness
+			}
+			signed[sig.Index], byKey[key] = true, true
+		}
+	}
+	for i, name := range witnesses {
+		if signed[i] {
+			w.Signed = append(w.Signed, name)
+		}
+	}
+	w.Met = uint64(len(w.Signed)) >= toad
+	return w
 }

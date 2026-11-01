@@ -51,9 +51,14 @@ func main() {
 			}
 			log[i] = b
 		}
+		// keripy accepts a witnessed event only once enough of its witnesses
+		// have signed it, so a log keri-go validates but whose witness
+		// threshold is not met is, for this comparison, refused.
 		verdict := "accepted"
-		if _, err := keri.ValidateSignedKEL(log); err != nil {
+		if res, err := keri.ValidateSignedKEL(log); err != nil {
 			verdict = "refused: " + err.Error()
+		} else if !res.FullyWitnessed() {
+			verdict = "refused: " + unwitnessed(res)
 		}
 		keripyAccepted := c.Keripy == "accepted"
 		kerigoAccepted := verdict == "accepted"
@@ -88,4 +93,15 @@ func main() {
 	if disagree > 0 {
 		os.Exit(1)
 	}
+}
+
+// unwitnessed names the first event whose witness threshold is not met.
+func unwitnessed(res *keri.SignedKELResult) string {
+	for _, w := range res.Witnessing {
+		if !w.Met {
+			return fmt.Sprintf("%s at sn %d has %d of the %d witness signatures it needs",
+				w.Ilk, w.SN, len(w.Signed), w.Threshold)
+		}
+	}
+	return "not fully witnessed"
 }
