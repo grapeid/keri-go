@@ -84,8 +84,9 @@ const (
 	// FaultIdentifierMismatch is an event attributed to a different identity
 	// than the log it arrived in.
 	FaultIdentifierMismatch FaultKind = "identifier-mismatch"
-	// FaultKeyNotPrecommitted is a rotation presenting a key the previous
-	// establishment event did not commit to.
+	// FaultKeyNotPrecommitted is a rotation whose keys could not open enough
+	// of the previous establishment event's commitments to meet its next
+	// threshold, even if every one of them signed.
 	FaultKeyNotPrecommitted FaultKind = "key-not-precommitted"
 	// FaultWitnessListInvalid is a witness list that cannot be right: a
 	// rotation cutting a witness that is not there or adding one that already
@@ -904,6 +905,12 @@ func ValidateKEL(events [][]byte) error {
 // Passing this is not authorisation. A rotation whose listed keys could open
 // enough commitments, but which was signed by too few of them, passes here and
 // is refused by ValidateSignedKEL.
+//
+// A rotation may also list keys the previous event never committed to (an
+// augmented rotation). KERI allows it, and keripy accepts it, when the
+// thresholds are met: such a key opens nothing and its signature counts toward
+// the new signing threshold only. So it is not a fault here. What a builder
+// chooses to emit is a narrower question, and never narrows what this accepts.
 func checkPrecommitment(fs *faults, ev *Event, committed []string, th *parsedThreshold) {
 	if len(ev.Keys) == 0 {
 		fs.add(FaultKeyNotPrecommitted, "a rotation must present the keys it is rotating to")
@@ -920,22 +927,16 @@ func checkPrecommitment(fs *faults, ev *Event, committed []string, th *parsedThr
 			fs.add(FaultKeyNotPrecommitted, "the key %s could not be digested: %v", key, err)
 			continue
 		}
-		at, ok := places[digest]
-		if !ok {
-			fs.add(FaultKeyNotPrecommitted, "the rotation presents the key %s, which digests "+
-				"to %s; the previous establishment event committed to %s, so this key was "+
-				"never pre-rotated to and whoever holds it cannot take over this identity",
-				key, digest, strings.Join(committed, ", "))
-			continue
-		}
-		for _, p := range at {
+		for _, p := range places[digest] {
 			openable[p] = true
 		}
 	}
 	if !th.satisfiedBy(openable) {
 		fs.add(FaultKeyNotPrecommitted, "even if every key it lists signed, the rotation "+
 			"could open only %d of the %d keys the previous establishment event committed "+
-			"to, which does not meet the next threshold it set", len(openable), len(committed))
+			"to (%s), which does not meet the next threshold it set, so whoever holds "+
+			"these keys cannot take over this identity", len(openable), len(committed),
+			strings.Join(committed, ", "))
 	}
 }
 
