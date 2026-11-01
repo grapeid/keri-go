@@ -1135,20 +1135,12 @@ func parseAttachments(attached []byte) ([]attachment, error) {
 			s = s[size:]
 			continue
 		case counterControllerIdxSigs, counterWitnessIdxSigs:
-			for i := 0; i < count; i++ {
-				if len(s) < sizeIndexedSig {
-					return nil, fmt.Errorf("the attachment group %q promises %d signatures "+
-						"and the stream ends %d characters into signature %d, so the "+
-						"attached material is incomplete", code, count, len(s), i+1)
-				}
-				qb64 := s[:sizeIndexedSig]
-				sig, err := readIndexedSig(qb64)
-				if err != nil {
-					return nil, err
-				}
-				group.Sigs = append(group.Sigs, sig)
-				s = s[sizeIndexedSig:]
+			sigs, used, err := readIndexedSigs(code, s, count)
+			if err != nil {
+				return nil, err
 			}
+			group.Sigs = sigs
+			s = s[used:]
 		case counterNonTransReceiptCouples:
 			for i := 0; i < count; i++ {
 				need := sizePrefix + sizeCigar
@@ -1184,29 +1176,116 @@ func parseAttachments(attached []byte) ([]attachment, error) {
 	return out, nil
 }
 
+// Indexed Ed25519 signature codes, as keripy 1.3.6's indexing table defines
+// them. The code says which lists the signature's places refer to and how wide
+// they are:
+//
+//	code  width  index      prior-next place (ondex)
+//	A     88     1 char     the same as the index
+//	B     88     1 char     none: the current list only
+//	2A    92     2 chars    2 chars of its own
+//	2B    92     2 chars    none; its two ondex characters must be zero
+//
+// A key whose place in k differs from the place it opens in the prior n needs
+// 2A; written as A it would be checked against the wrong commitment.
+const (
+	codeIdxSig       = "A"
+	codeIdxCrtSig    = "B"
+	codeIdxBigSig    = "2A"
+	codeIdxBigCrtSig = "2B"
+
+	sizeIndexedBigSig = 92 // two-character code, two of index, two of ondex, then 86
+)
+
+// indexedSigWidth is how many characters the indexed signature at the start of
+// s occupies, read from its code. A code this package does not know is
+// refused, because guessing its width would read whatever follows from the
+// wrong offset.
+func indexedSigWidth(s string) (int, error) {
+	switch {
+	case strings.HasPrefix(s, codeIdxBigSig), strings.HasPrefix(s, codeIdxBigCrtSig):
+		return sizeIndexedBigSig, nil
+	case strings.HasPrefix(s, codeIdxSig), strings.HasPrefix(s, codeIdxCrtSig):
+		return sizeIndexedSig, nil
+	}
+	return 0, fmt.Errorf("%.2q is not an Ed25519 indexed signature code", s)
+}
+
+// readIndexedSigs reads count indexed signatures from the front of s and
+// returns them with the number of characters they occupied.
+func readIndexedSigs(code, s string, count int) ([]indexedSig, int, error) {
+	var out []indexedSig
+	used := 0
+	for i := 0; i < count; i++ {
+		rest := s[used:]
+		if rest == "" {
+			return nil, 0, fmt.Errorf("the attachment group %q promises %d signatures "+
+				"and the stream ends before signature %d, so the attached material is "+
+				"incomplete", code, count, i+1)
+		}
+		width, err := indexedSigWidth(rest)
+		if err != nil {
+			return nil, 0, err
+		}
+		if len(rest) < width {
+			return nil, 0, fmt.Errorf("the attachment group %q promises %d signatures "+
+				"and the stream ends %d characters into signature %d, so the "+
+				"attached material is incomplete", code, count, len(rest), i+1)
+		}
+		sig, err := readIndexedSig(rest[:width])
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, sig)
+		used += width
+	}
+	return out, used, nil
+}
+
 func readIndexedSig(qb64 string) (indexedSig, error) {
-	if len(qb64) != sizeIndexedSig {
-		return indexedSig{}, fmt.Errorf("an indexed signature is %d characters, this one is %d",
-			sizeIndexedSig, len(qb64))
-	}
-	switch qb64[0] {
-	case 'A', 'B':
-	default:
-		return indexedSig{}, fmt.Errorf("%.2q is not an Ed25519 indexed signature code", qb64)
-	}
-	idx, err := b64Int(qb64[1:2])
+	width, err := indexedSigWidth(qb64)
 	if err != nil {
-		return indexedSig{}, fmt.Errorf("the signature's index is not readable: %w", err)
+		return indexedSig{}, err
 	}
-	raw, err := MatterRaw(qb64[:2], qb64, ed25519.SignatureSize)
+	if len(qb64) != width {
+		return indexedSig{}, fmt.Errorf("an indexed signature with code %.2q is %d characters, "+
+			"this one is %d", qb64, width, len(qb64))
+	}
+	sig := indexedSig{QB64: qb64}
+	var codeLen int
+	if width == sizeIndexedBigSig {
+		sig.Code, codeLen = qb64[:2], 6
+		if sig.Index, err = b64Int(qb64[2:4]); err != nil {
+			return indexedSig{}, fmt.Errorf("the signature's index is not readable: %w", err)
+		}
+		ondex, err := b64Int(qb64[4:6])
+		if err != nil {
+			return indexedSig{}, fmt.Errorf("the signature's prior-next place is not "+
+				"readable: %w", err)
+		}
+		if sig.Code == codeIdxBigSig {
+			sig.Ondex, sig.HasOndex = ondex, true
+		} else if ondex != 0 {
+			// The reference refuses this, so it is refused here: a current-only
+			// signature has no second place, and a non-zero one would be a
+			// second spelling of the same signature.
+			return indexedSig{}, fmt.Errorf("a current-only signature (%s) carries no "+
+				"prior-next place, and this one carries %d", codeIdxBigCrtSig, ondex)
+		}
+	} else {
+		sig.Code, codeLen = qb64[:1], 2
+		if sig.Index, err = b64Int(qb64[1:2]); err != nil {
+			return indexedSig{}, fmt.Errorf("the signature's index is not readable: %w", err)
+		}
+		if sig.Code == codeIdxSig {
+			sig.Ondex, sig.HasOndex = sig.Index, true
+		}
+	}
+	raw, err := MatterRaw(qb64[:codeLen], qb64, ed25519.SignatureSize)
 	if err != nil {
 		return indexedSig{}, fmt.Errorf("the attached signature is not readable: %w", err)
 	}
-	sig := indexedSig{QB64: qb64, Code: qb64[:1], Index: idx, Raw: raw}
-	// "A" names the same place in both lists; "B" is the current list only.
-	if sig.Code == "A" {
-		sig.Ondex, sig.HasOndex = idx, true
-	}
+	sig.Raw = raw
 	return sig, nil
 }
 

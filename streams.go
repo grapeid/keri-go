@@ -155,9 +155,9 @@ func AttachControllerSigs(sigers []string) ([]byte, error) {
 		return nil, fmt.Errorf("a controller-signature group needs at least one signature")
 	}
 	for i, s := range sigers {
-		if len(s) != sizeIndexedSig {
-			return nil, fmt.Errorf("controller signature %d is %d characters, not %d",
-				i, len(s), sizeIndexedSig)
+		if _, err := readIndexedSig(s); err != nil {
+			return nil, fmt.Errorf("controller signature %d is not an indexed signature: %w",
+				i, err)
 		}
 	}
 	frame, err := counterFrame(CounterControllerIdxSigs, len(sigers))

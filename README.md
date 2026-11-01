@@ -76,6 +76,7 @@ that gap.
 | Credentials | ACDC credentials, registries, issuance, revocation, **edge-chain verification** |
 | Keys | generation, pre-rotation custody, encrypted-at-rest storage, an interface a hardware signer can satisfy |
 | Streams | CESR attachments, and publishing or reading a whole key log |
+| Signatures | indexed Ed25519 in all four forms keripy defines: `A` and `2A` (a place in the key list and a place in the prior next-key commitments, the same or apart), `B` and `2B` (the key list only) |
 
 Both CESR 1.0 and 2.0 can be read and built. **1.0 is the default**, because 2.0
 is not frozen: two builds of the reference produce different 2.0 bytes, and a
