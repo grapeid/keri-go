@@ -230,62 +230,23 @@ func hexCount(n int) string {
 // threshold fall below 1, because an identity that needs no signatures is not an
 // identity. A next-key threshold over an empty list is legitimately 0.
 func renderThreshold(raw json.RawMessage, count, floor int, field string) (json.RawMessage, error) {
-	trimmed := strings.TrimSpace(string(raw))
-	if trimmed == "" || trimmed == "null" {
-		n := (count + 1) / 2 // ceil(count/2)
-		if n < floor {
-			n = floor
-		}
-		return json.Marshal(hexCount(n))
-	}
-
-	switch trimmed[0] {
-	case '[':
-		return renderWeightedThreshold(trimmed, count, field)
-	case '"':
-		var s string
-		if err := json.Unmarshal(raw, &s); err != nil {
-			return nil, fmt.Errorf("%s is not readable: %w", field, err)
-		}
-		n, err := strconv.ParseInt(s, 16, 64)
-		if err != nil {
-			return nil, fmt.Errorf("%s is %q, which is neither a hex threshold nor a "+
-				"list of weights", field, s)
-		}
-		if err := checkThresholdFits(int(n), count, floor, field); err != nil {
-			return nil, err
-		}
-		// Re-rendered rather than passed through: the reference normalises, so
-		// "02" and "2" must both come out as "2" or the same threshold would
-		// produce two identities.
-		return json.Marshal(hexCount(int(n)))
-	default:
-		var n int64
-		if err := json.Unmarshal(raw, &n); err != nil {
-			return nil, fmt.Errorf("%s is not a threshold: %w", field, err)
-		}
-		if err := checkThresholdFits(int(n), count, floor, field); err != nil {
-			return nil, err
-		}
-		return json.Marshal(hexCount(int(n)))
-	}
-}
-
-// renderWeightedThreshold validates and re-emits a threshold written as
-// weights, through the one threshold reader and renderer (threshold.go).
-//
-// Re-emitted rather than passed through because the incoming bytes may carry
-// whitespace or unreduced fractions, and either changes the event's length and
-// therefore its identifier. Order is preserved throughout, because weight n
-// belongs to key n.
-func renderWeightedThreshold(trimmed string, count int, field string) (json.RawMessage, error) {
-	t, err := weightedThreshold(trimmed)
+	// Read and rendered by the one threshold implementation (threshold.go);
+	// what is added here is only what an inception and a delegated inception
+	// require of it: a stated count within floor..count, and no more weights
+	// than keys.
+	t, err := parseThresholdValue(raw, max(floor, ceilDiv(count, 2)))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", field, err)
 	}
-	if t.size > count {
+	stated := strings.TrimSpace(string(raw))
+	switch {
+	case t.weighted && t.size > count:
 		return nil, fmt.Errorf("%s carries %d weights but there are only %d keys to "+
 			"weigh, so the threshold could never be met", field, t.size, count)
+	case !t.weighted && stated != "" && stated != "null":
+		if err := checkThresholdFits(t.size, count, floor, field); err != nil {
+			return nil, err
+		}
 	}
 	return t.value, nil
 }

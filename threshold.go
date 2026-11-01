@@ -421,8 +421,9 @@ func ratString(r *big.Rat) string { return r.RatString() }
 // threshold of 3 over 2 keys can never be met, and an identity that commits to
 // one has locked itself out permanently.
 type threshold struct {
-	value json.RawMessage
-	size  int
+	value    json.RawMessage
+	size     int
+	weighted bool
 }
 
 // parseThresholdValue renders a threshold supplied by a caller the way the
@@ -497,7 +498,7 @@ func weightedThreshold(js string) (threshold, error) {
 	}
 	// A weight sits against a specific key by position, so a weighted threshold
 	// states exactly how many keys there must be.
-	return threshold{value: t.render(), size: t.slots()}, nil
+	return threshold{value: t.render(), size: t.slots(), weighted: true}, nil
 }
 
 // ample returns the witness threshold to use when a rotation does not state
