@@ -161,3 +161,28 @@ func TestAnUnwitnessedIdentityIsTriviallyWitnessed(t *testing.T) {
 		t.Fatalf("an identity with no witnesses was not fully witnessed: %+v", res.Witnessing)
 	}
 }
+
+// A rotation that cuts a witness and adds it back in the same event. keripy
+// refuses it as intersecting cuts and adds, and so does BuildRotation, so the
+// validator must too.
+func TestARotationCuttingAndReAddingOneWitnessIsRefused(t *testing.T) {
+	a, c, e := newRotKey(t, 'a'), newRotKey(t, 'c'), newRotKey(t, 'e')
+	w1, w2, w3 := newWitness(t, 1), newWitness(t, 2), newWitness(t, 3)
+	icp, icpMsg, icpEv := witnessedInception(t, a, digestsOf(c), []rotKey{w1, w2}, 1)
+	icpMsg = withWitnessSigs(t, icpMsg, icp, placedSig{key: w1, code: "A", index: 0})
+	honest, err := BuildRotation(RotationInput{
+		Prefix: icpEv.Identifier, PriorSAID: icpEv.SAID, SN: 1,
+		Keys: pubsOf(c), NextDigests: digestsOf(e),
+		PriorWitnesses: pubsOf(w1, w2), Cuts: pubsOf(w1), Adds: pubsOf(w3), Toad: intPtr(2),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rot := substitute(t, honest, w3.pub, w1.pub) // br = [w1], ba = [w1]
+	rotMsg := withWitnessSigs(t, handMessage(t, rot, placedSig{key: c, code: "A", index: 0}),
+		rot, placedSig{key: w2, code: "A", index: 0}, placedSig{key: w1, code: "A", index: 1})
+
+	_, err = ValidateSignedKEL([][]byte{icpMsg, rotMsg})
+	wantRefusedFor(t, err, FaultWitnessListInvalid,
+		"a rotation that cuts a witness and adds it back in the same event")
+}

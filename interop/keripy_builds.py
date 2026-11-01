@@ -292,6 +292,35 @@ def main():
     witnessed_case("one-witness", "toad = 2 over [w1, w2]; w1 alone, once",
                    refused, [w1, w2], 2, [(w1, 0, A)])
 
+    # A rotation that cuts a witness and adds it back in the same event.
+    # keripy's builder refuses to write it, so it is written with w3 added and
+    # then w3 replaced by w1, with the identifier recomputed. Both refuse it.
+    o, c, e = fresh(), fresh(), fresh()
+    w3 = witness(0x33)
+    icp = eventing.incept(keys=[o.verfer.qb64], isith="1", ndigs=[dig(c)], nsith="1",
+                          wits=[w1.verfer.qb64, w2.verfer.qb64], toad=1,
+                          code=MtrDex.Blake3_256)
+    icp_msg = bytes(eventing.messagize(icp, sigers=[o.sign(icp.raw, index=0)],
+                                       wigers=[w1.sign(icp.raw, index=0)]))
+    honest = eventing.rotate(pre=icp.pre, keys=[c.verfer.qb64], dig=icp.said, sn=1,
+                             isith="1", ndigs=[dig(e)], nsith="1",
+                             wits=[w1.verfer.qb64, w2.verfer.qb64],
+                             cuts=[w1.verfer.qb64], adds=[w3.verfer.qb64], toad=2)
+    ked = dict(honest.ked)
+    ked["ba"] = [w1.verfer.qb64]
+    rot = serdering.SerderKERI(sad=ked, makify=True)
+    rot_msg = bytes(eventing.messagize(rot, sigers=[c.sign(rot.raw, index=0)],
+                                       wigers=[w2.sign(rot.raw, index=0),
+                                               w1.sign(rot.raw, index=1)]))
+    cases.append({
+        "label": "witness-cut-and-re-added",
+        "why": "br = [w1] and ba = [w1] in one rotation",
+        "expect": refused, "codes": ["A", "A"],
+        "messages_b64": [base64.b64encode(m).decode() for m in (icp_msg, rot_msg)],
+        "keripy": keripy_verdict([icp_msg, rot_msg], rot.said),
+        "divergence": "",
+    })
+
     # Every case must be judged by keripy as the case says, or the shape
     # tested is not the shape described.
     for c in cases:

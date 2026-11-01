@@ -988,7 +988,24 @@ func witnessKey(aid string) (string, error) {
 	return string(pub), nil
 }
 
+// checkWitnessChange holds a rotation's witness delta to the witnesses it
+// changes: a cut must name a current witness, an add must not, and no witness
+// may be both cut and added in one event. A cut-and-re-add changes nothing a
+// peer can see, and the reference refuses it ("Intersecting cuts and adds"), as
+// BuildRotation does; compared by key, as every witness comparison here is.
 func checkWitnessChange(fs *faults, ev *Event, current []string) {
+	cutKeys := make(map[string]bool, len(ev.WitnessCut))
+	for _, w := range ev.WitnessCut {
+		if k, err := witnessKey(w); err == nil {
+			cutKeys[k] = true
+		}
+	}
+	for _, w := range ev.WitnessAdd {
+		if k, err := witnessKey(w); err == nil && cutKeys[k] {
+			fs.add(FaultWitnessListInvalid, "the rotation both cuts and adds the witness "+
+				"%s, which keripy refuses as intersecting cuts and adds", w)
+		}
+	}
 	have := make(map[string]bool, len(current))
 	for _, w := range current {
 		have[w] = true
