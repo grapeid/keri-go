@@ -586,182 +586,6 @@ func computeSAID(ev *Event) (string, error) {
 }
 
 // -----------------------------------------------------------------------------
-// Thresholds
-// -----------------------------------------------------------------------------
-
-// parsedThreshold is a signing parsedThreshold: either a count of signatures, or a weight
-// per key that must sum to one.
-type parsedThreshold struct {
-	weighted bool
-	count    uint64
-	// clauses holds the weights, grouped. An unnested list is one clause.
-	clauses [][]fraction
-}
-
-type fraction struct{ num, den uint64 }
-
-// parseThreshold reads a kt / nt / bt value.
-//
-// A parsedThreshold arrives either as a hexadecimal count ("2") or as weights
-// (["1/2","1/2","1/2"]), optionally nested into clauses. Hexadecimal rather than
-// decimal is not a guess: it is what the reference implementation parses, and
-// for a ten-key identity "a" and "10" are different thresholds.
-func parseThreshold(raw []byte) (*parsedThreshold, error) {
-	if s, ok := jsonString(raw); ok {
-		n, err := canonicalHex(s)
-		if err != nil {
-			return nil, err
-		}
-		return &parsedThreshold{count: n}, nil
-	}
-	var items []json.RawMessage
-	if err := json.Unmarshal(raw, &items); err != nil {
-		return nil, fmt.Errorf("a parsedThreshold must be a count or a list of weights")
-	}
-	t := &parsedThreshold{weighted: true}
-	for _, item := range items {
-		if s, ok := jsonString(item); ok {
-			// A flat list is a single clause.
-			if len(t.clauses) == 0 {
-				t.clauses = append(t.clauses, nil)
-			}
-			f, err := parseFraction(s)
-			if err != nil {
-				return nil, err
-			}
-			t.clauses[0] = append(t.clauses[0], f)
-			continue
-		}
-		var inner []string
-		if err := json.Unmarshal(item, &inner); err != nil {
-			return nil, fmt.Errorf("a parsedThreshold weight must be a fraction or a list of them")
-		}
-		clause := make([]fraction, 0, len(inner))
-		for _, s := range inner {
-			f, err := parseFraction(s)
-			if err != nil {
-				return nil, err
-			}
-			clause = append(clause, f)
-		}
-		t.clauses = append(t.clauses, clause)
-	}
-	return t, nil
-}
-
-func parseFraction(s string) (fraction, error) {
-	if i := strings.IndexByte(s, '/'); i >= 0 {
-		num, err1 := strconv.ParseUint(s[:i], 10, 64)
-		den, err2 := strconv.ParseUint(s[i+1:], 10, 64)
-		if err1 != nil || err2 != nil || den == 0 {
-			return fraction{}, fmt.Errorf("weight %q is not a fraction", s)
-		}
-		return fraction{num, den}, nil
-	}
-	n, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return fraction{}, fmt.Errorf("weight %q is not a number", s)
-	}
-	return fraction{n, 1}, nil
-}
-
-// slots is how many keys a weighted parsedThreshold describes.
-func (t *parsedThreshold) slots() int {
-	n := 0
-	for _, c := range t.clauses {
-		n += len(c)
-	}
-	return n
-}
-
-// exceeds reports whether this parsedThreshold can never be met by n keys, and says
-// why in plain words.
-func (t *parsedThreshold) exceeds(n int) (bool, string) {
-	if t == nil {
-		return false, ""
-	}
-	if !t.weighted {
-		if t.count == 0 {
-			return true, "the parsedThreshold is zero, so no signature would ever be required"
-		}
-		if t.count > uint64(n) {
-			return true, fmt.Sprintf("the parsedThreshold is %d but only %d keys are supplied", t.count, n)
-		}
-		return false, ""
-	}
-	if got := t.slots(); got != n {
-		return true, fmt.Sprintf("the parsedThreshold gives %d weights for %d keys", got, n)
-	}
-	for i, c := range t.clauses {
-		if !clauseReaches(c) {
-			return true, fmt.Sprintf("the weights in clause %d cannot reach 1, so the "+
-				"parsedThreshold could never be met", i)
-		}
-	}
-	return false, ""
-}
-
-// clauseReaches reports whether every weight in a clause together sums to at
-// least one — the condition for the clause to be satisfiable at all.
-func clauseReaches(c []fraction) bool {
-	return sumReaches(c, allIndices(len(c)))
-}
-
-func allIndices(n int) map[int]bool {
-	m := make(map[int]bool, n)
-	for i := 0; i < n; i++ {
-		m[i] = true
-	}
-	return m
-}
-
-// sumReaches reports whether the weights at the given positions sum to >= 1.
-// Done in integers: floating point would make a parsedThreshold of exactly one
-// sometimes fail, and "sometimes" is the worst behaviour a validator can have.
-func sumReaches(c []fraction, at map[int]bool) bool {
-	var num, den uint64 = 0, 1
-	for i, f := range c {
-		if !at[i] {
-			continue
-		}
-		num = num*f.den + f.num*den
-		den *= f.den
-	}
-	return num >= den
-}
-
-// satisfiedBy reports whether the positions supplied meet this parsedThreshold.
-func (t *parsedThreshold) satisfiedBy(at map[int]bool, total int) bool {
-	if t == nil {
-		return false
-	}
-	if !t.weighted {
-		return uint64(len(at)) >= t.count
-	}
-	if t.slots() != total {
-		// The weights do not describe this key list, so no set of positions in
-		// it can be said to satisfy them.
-		return false
-	}
-	// Positions are numbered across the whole key list; walk the clauses in
-	// order and offset into them. Every clause must be met.
-	offset := 0
-	for _, c := range t.clauses {
-		local := make(map[int]bool)
-		for i := range c {
-			if at[offset+i] {
-				local[i] = true
-			}
-		}
-		if !sumReaches(c, local) {
-			return false
-		}
-		offset += len(c)
-	}
-	return true
-}
-
-// -----------------------------------------------------------------------------
 // Validating one event
 // -----------------------------------------------------------------------------
 
@@ -969,9 +793,10 @@ func checkThresholds(fs *faults, ev *Event) {
 //   - every event names the same identity
 //   - sequence numbers are contiguous, so nothing was inserted or dropped
 //   - every event digests its predecessor, so nothing was substituted
-//   - every rotation presents keys the previous establishment event committed
-//     to, so the identity cannot be taken over by someone who never held the
-//     committed material
+//   - every rotation lists keys that could, by signing, open enough of the
+//     previous establishment event's commitments to meet its next threshold.
+//     Whether the keys that actually signed do is ValidateSignedKEL's
+//     question, because it needs the signatures
 //   - a rotation's witness changes refer to witnesses that are actually there
 //
 // Two things it deliberately does NOT check, stated here because a caller who
@@ -1065,30 +890,37 @@ func ValidateKEL(events [][]byte) error {
 	return fs.err()
 }
 
-// checkPrecommitment is the rule that makes a key rotation safe.
+// checkPrecommitment is what can be said about a rotation's pre-rotation
+// without its signatures.
 //
 // The previous establishment event published DIGESTS of the keys that would
-// come next, and never the keys. So a rotation proves it was planned by the
-// same controller by presenting keys those digests cover — and an attacker who
-// has stolen the current key still cannot rotate, because they never had the
-// next one.
+// come next, and a threshold over them. Whether a rotation is authorised turns
+// on which of those commitments the keys that SIGNED it open, and only
+// ValidateSignedKEL has the signatures. What can be decided here is the
+// necessary half: if every key the rotation lists were to sign, the
+// commitments they could open must meet the prior next threshold. A rotation
+// that fails that can never be authorised by any set of signatures.
+//
+// Passing this is not authorisation. A rotation whose listed keys could open
+// enough commitments, but which was signed by too few of them, passes here and
+// is refused by ValidateSignedKEL.
 func checkPrecommitment(fs *faults, ev *Event, committed []string, th *parsedThreshold) {
 	if len(ev.Keys) == 0 {
 		fs.add(FaultKeyNotPrecommitted, "a rotation must present the keys it is rotating to")
 		return
 	}
-	index := make(map[string]int, len(committed))
+	places := make(map[string][]int, len(committed))
 	for i, d := range committed {
-		index[d] = i
+		places[d] = append(places[d], i)
 	}
-	used := make(map[int]bool, len(ev.Keys))
+	openable := make(map[int]bool, len(ev.Keys))
 	for _, key := range ev.Keys {
 		digest, err := Blake3SAID([]byte(key))
 		if err != nil {
 			fs.add(FaultKeyNotPrecommitted, "the key %s could not be digested: %v", key, err)
 			continue
 		}
-		at, ok := index[digest]
+		at, ok := places[digest]
 		if !ok {
 			fs.add(FaultKeyNotPrecommitted, "the rotation presents the key %s, which digests "+
 				"to %s; the previous establishment event committed to %s, so this key was "+
@@ -1096,11 +928,14 @@ func checkPrecommitment(fs *faults, ev *Event, committed []string, th *parsedThr
 				key, digest, strings.Join(committed, ", "))
 			continue
 		}
-		used[at] = true
+		for _, p := range at {
+			openable[p] = true
+		}
 	}
-	if len(used) > 0 && th != nil && !th.satisfiedBy(used, len(committed)) {
-		fs.add(FaultKeyNotPrecommitted, "the keys presented satisfy only %d of the committed "+
-			"next keys, which does not meet the parsedThreshold the previous event set", len(used))
+	if !th.satisfiedBy(openable) {
+		fs.add(FaultKeyNotPrecommitted, "even if every key it lists signed, the rotation "+
+			"could open only %d of the %d keys the previous establishment event committed "+
+			"to, which does not meet the next threshold it set", len(openable), len(committed))
 	}
 }
 
@@ -1212,10 +1047,19 @@ type attachment struct {
 	Couples []receiptCouple
 }
 
+// indexedSig is one indexed signature as read from an attachment.
+//
+// Index is the place in the current key list of the key that made it. Ondex,
+// when HasOndex, is the place in the PRIOR establishment event's next-key
+// commitments that the same key opens; a current-only code carries none, and
+// such a signature counts toward the signing threshold but opens nothing.
 type indexedSig struct {
-	QB64  string
-	Index int
-	Raw   []byte
+	QB64     string
+	Code     string
+	Index    int
+	Ondex    int
+	HasOndex bool
+	Raw      []byte
 }
 
 type receiptCouple struct {
@@ -1358,7 +1202,12 @@ func readIndexedSig(qb64 string) (indexedSig, error) {
 	if err != nil {
 		return indexedSig{}, fmt.Errorf("the attached signature is not readable: %w", err)
 	}
-	return indexedSig{QB64: qb64, Index: idx, Raw: raw}, nil
+	sig := indexedSig{QB64: qb64, Code: qb64[:1], Index: idx, Raw: raw}
+	// "A" names the same place in both lists; "B" is the current list only.
+	if sig.Code == "A" {
+		sig.Ondex, sig.HasOndex = idx, true
+	}
+	return sig, nil
 }
 
 const b64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
@@ -1411,44 +1260,7 @@ func ValidateStream(raw []byte) error {
 }
 
 func verifyControllerSigs(fs *faults, ev *Event, groups []attachment) {
-	signed := make(map[int]bool)
-	for _, g := range groups {
-		if g.Counter != counterControllerIdxSigs {
-			continue
-		}
-		for _, sig := range g.Sigs {
-			if sig.Index < 0 || sig.Index >= len(ev.Keys) {
-				fs.add(FaultSignatureInvalid, "a signature claims key %d and the event "+
-					"carries %d keys", sig.Index, len(ev.Keys))
-				continue
-			}
-			pub, err := MatterRaw(CodeEd25519, ev.Keys[sig.Index], ed25519.PublicKeySize)
-			if err != nil {
-				pub, err = MatterRaw(CodeEd25519N, ev.Keys[sig.Index], ed25519.PublicKeySize)
-			}
-			if err != nil {
-				fs.add(FaultSignatureInvalid, "key %d (%s) is not a readable Ed25519 public "+
-					"key: %v", sig.Index, ev.Keys[sig.Index], err)
-				continue
-			}
-			if !ed25519.Verify(pub, ev.Raw, sig.Raw) {
-				fs.add(FaultSignatureInvalid, "the signature attached for key %d (%s) does "+
-					"not verify over this event, so whoever produced it did not hold that key",
-					sig.Index, ev.Keys[sig.Index])
-				continue
-			}
-			signed[sig.Index] = true
-		}
-	}
-	if len(signed) == 0 {
-		fs.add(FaultThresholdNotMet, "the event arrives with no controller signature that "+
-			"verifies, so nothing attests that its own controller produced it")
-		return
-	}
-	if ev.SigThreshold != nil && !ev.SigThreshold.satisfiedBy(signed, len(ev.Keys)) {
-		fs.add(FaultThresholdNotMet, "%d of %d keys signed, which does not meet the "+
-			"parsedThreshold the event sets", len(signed), len(ev.Keys))
-	}
+	verifyAgainstKeyState(fs, ev, groups, ev.Keys, ev.SigThreshold)
 }
 
 // -----------------------------------------------------------------------------

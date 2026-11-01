@@ -69,7 +69,7 @@ that gap.
 | | |
 |---|---|
 | Key events | inception, rotation, interaction, delegated inception and rotation |
-| Thresholds | integer and fractional-weight, for both current and next keys |
+| Thresholds | integer and fractional-weight, including nested weighted sets, for both current and next keys; `SatisfiesThreshold` answers whether signatures at given places meet one |
 | Witnesses | witness lists, thresholds, receipts, receipt streams |
 | Validation | key-log validation, signature verification against established key state, delegation authority |
 | Duplicity | detection of two conflicting events at one sequence number |
