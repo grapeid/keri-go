@@ -1162,14 +1162,11 @@ func parseAttachments(attached []byte) ([]attachment, error) {
 			// Identifier, sequence number, event digest, signature. Sized from
 			// the CESR tables; no vector in this suite exercises it, which is
 			// why it is stated here rather than assumed silently elsewhere.
-			need := sizePrefix + sizeSeqner + sizePrefix + sizeIndexedSig
-			for i := 0; i < count; i++ {
-				if len(s) < need {
-					return nil, fmt.Errorf("the attachment group %q promises %d receipts and "+
-						"the stream ends %d characters into receipt %d", code, count, len(s), i+1)
-				}
-				s = s[need:]
+			used, err := transReceiptQuadruplesWidth(code, s, count)
+			if err != nil {
+				return nil, err
 			}
+			s = s[used:]
 		default:
 			return nil, fmt.Errorf("the attachment group %q is one this validator does not "+
 				"know how to read, so the rest of the stream cannot be trusted", code)
@@ -1243,6 +1240,27 @@ func readIndexedSigs(code, s string, count int) ([]indexedSig, int, error) {
 		used += width
 	}
 	return out, used, nil
+}
+
+// transReceiptQuadruplesWidth measures count transferable receipt quadruples
+// at the front of s: an identifier, a sequence number and an event digest of
+// fixed width, then an indexed signature whose width comes from its own code.
+func transReceiptQuadruplesWidth(code, s string, count int) (int, error) {
+	const fixed = sizePrefix + sizeSeqner + sizePrefix
+	used := 0
+	for i := 0; i < count; i++ {
+		if len(s)-used < fixed {
+			return 0, fmt.Errorf("the attachment group %q promises %d receipts and "+
+				"the stream ends %d characters into receipt %d", code, count, len(s)-used, i+1)
+		}
+		used += fixed
+		_, n, err := readIndexedSigs(code, s[used:], 1)
+		if err != nil {
+			return 0, err
+		}
+		used += n
+	}
+	return used, nil
 }
 
 func readIndexedSig(qb64 string) (indexedSig, error) {

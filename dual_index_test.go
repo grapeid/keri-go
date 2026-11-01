@@ -37,7 +37,7 @@ func TestAKeyOpeningALaterCommitmentSignsWithBothPlaces(t *testing.T) {
 }
 
 // Two owners, each of whom must act, in the stage-one layout: owner i holds
-// k[i] and commitments n[2i] (classical) and n[2i+1] (reserve). Owner 1's key
+// k[i] and commitments n[2i] (first) and n[2i+1] (second). Owner 1's key
 // sits at k[1] and opens n[2], so it needs the dual-index form.
 func TestTwoOwnersRotateWithTheSecondOwnerOpeningADifferentPlace(t *testing.T) {
 	const nt = `[["1","1"],["1","1"]]`
@@ -52,10 +52,10 @@ func TestTwoOwnersRotateWithTheSecondOwnerOpeningADifferentPlace(t *testing.T) {
 	if _, err := ValidateSignedKEL([][]byte{icp, handMessage(t, rot,
 		placedSig{key: c0, code: "A", index: 0},
 		placedSig{key: c1, code: "2A", index: 1, ondex: 2})}); err != nil {
-		t.Fatalf("both owners revealing their classical keys was refused: %v", err)
+		t.Fatalf("both owners revealing their first keys was refused: %v", err)
 	}
 
-	// Owner 1 writing a single index names n[1], owner 0's reserve: owner 1's
+	// Owner 1 writing a single index names n[1], owner 0's second commitment: owner 1's
 	// clause is then unmet.
 	_, err := ValidateSignedKEL([][]byte{icp, handMessage(t, rot,
 		placedSig{key: c0, code: "A", index: 0},
@@ -106,5 +106,33 @@ func TestAPublishedLogWithDualIndexSignaturesSplitsCorrectly(t *testing.T) {
 	}
 	if len(back) != 2 || string(back[1]) != string(rot) {
 		t.Fatalf("the published log split into %d messages, not the two it holds", len(back))
+	}
+}
+
+// A transferable receipt quadruple carries an indexed signature too, and a
+// 2A one is 92 characters. Measured at 88, the next message would be read
+// from the wrong offset.
+func TestAReceiptQuadrupleWithADualIndexSignatureIsMeasuredByItsCode(t *testing.T) {
+	a, b, c := newRotKey(t, 'a'), newRotKey(t, 'b'), newRotKey(t, 'c')
+	icp, icpEv := foundedOn(t, []rotKey{a}, `"1"`, digestsOf(b), `"1"`)
+	other, _ := foundedOn(t, []rotKey{c}, `"1"`, digestsOf(b), `"1"`)
+	sig := handSig(t, icpEv.Raw, placedSig{key: a, code: "2A", index: 70, ondex: 70})
+	quad := "-DAB" + icpEv.Identifier + "0AAAAAAAAAAAAAAAAAAAAAAA" + icpEv.SAID + sig
+	withReceipt := append(append([]byte{}, icp...), quad...)
+
+	stream := append(append([]byte{}, withReceipt...), other...)
+	back, err := ParseKELStream(stream)
+	if err != nil {
+		t.Fatalf("a stream carrying a receipt quadruple with a 2A signature was unreadable: %v", err)
+	}
+	if len(back) != 2 || string(back[0]) != string(withReceipt) {
+		t.Fatalf("the stream split into %d messages at the wrong places", len(back))
+	}
+	_, attached, err := splitStream(withReceipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parseAttachments(attached); err != nil {
+		t.Fatalf("the receipt quadruple's attachments were refused: %v", err)
 	}
 }

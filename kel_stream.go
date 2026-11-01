@@ -147,8 +147,9 @@ func attachmentWidth(s []byte) (int, error) {
 // change somebody reviews. A width that is wrong here does not fail loudly — it
 // silently reads the next message from the wrong offset.
 //
-// Indexed signatures are measured one by one, because each one's width depends
-// on its own code (88 characters for A and B, 92 for 2A and 2B).
+// Indexed signatures, alone or inside a transferable receipt quadruple, are
+// measured one by one, because each one's width depends on its own code (88
+// characters for A and B, 92 for 2A and 2B).
 func groupBodyWidth(code string, count int, body string) (int, error) {
 	switch code {
 	case counterControllerIdxSigs, counterWitnessIdxSigs:
@@ -159,7 +160,7 @@ func groupBodyWidth(code string, count int, body string) (int, error) {
 	case CounterSealSourceCouples:
 		return count * (sizeSeqner + saidPlaceholderLen), nil
 	case counterTransReceiptQuadruples:
-		return count * (sizePrefix + sizeSeqner + saidPlaceholderLen + sizeCigar), nil
+		return transReceiptQuadruplesWidth(code, body, count)
 	case counterAttachedMaterial:
 		// The count is in quadlets of four characters, and the body is another
 		// sequence of groups — already measured by the count.
