@@ -135,8 +135,18 @@ run if the two disagree. Both directions exit non-zero on any disagreement.
 One difference is deliberate and tested as such: keripy counts a key once per
 verified signature and removes only byte-identical ones, so one key signing at
 one place in two spellings (A and B, or A and 2A) counts twice and can meet a
-two-key signing or prior-next threshold alone. keri-go counts each place once
-and refuses those logs.
+two-key signing or prior-next threshold alone. The same holds for a witness
+signing as A0 and B0 against a witness threshold of two. keripy also accepts a
+key list that names one key twice (`k = [a, a]`, or `n = [H(c), H(c)]`), which
+lets that key count at both places. keri-go counts each place and each witness
+once and refuses any establishment event that repeats a key or digest. It
+refuses the key and digest cases outright, and reports the re-encoded witness
+case as not fully witnessed.
+
+`ValidateSignedKEL` reports each event's witness-indexed signatures in
+`Witnessing`, counted against the witness list in force for that event, and
+`FullyWitnessed` says whether every event meets its witness threshold. The
+judge counts a log that is not fully witnessed as refused, as keripy does.
 
 keriox judges 35 of the 45 cases as expected, including witness receipts,
 delegation, a credential registry, issuance and revocation, a whole key log

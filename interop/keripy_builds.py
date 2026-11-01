@@ -11,7 +11,9 @@ keri-go, which must reach the same verdict:
 The shapes are the ones whose authority turns on which keys signed: a partial
 rotation with a dual-index signature, an augmented rotation as keripy signs it,
 nested weighted thresholds for two and three owners, and the refusals (too few
-committed keys signing, a wrong prior-next place, an added key alone).
+committed keys signing, a wrong prior-next place, an added key alone). Then the
+witness-indexed signatures that meet, or only appear to meet, a witness
+threshold, and the deliberate divergences: one key or witness counted twice.
 """
 
 import base64
@@ -94,7 +96,7 @@ def case(label, why, expect, icp_keys, isith, ndigs, nsith, rot_keys, rsith,
     })
 
 
-def icp_case(label, why, expect, keys, isith, ndigs, nsith, signing=None):
+def icp_case(label, why, expect, keys, isith, ndigs, nsith, signing=None, divergence=""):
     """An inception alone, signed by the keys at the places in signing
     (default: every key at its own place)."""
     icp = eventing.incept(keys=[s.verfer.qb64 for s in keys], isith=isith,
@@ -107,7 +109,32 @@ def icp_case(label, why, expect, keys, isith, ndigs, nsith, signing=None):
         "codes": [sg.code for sg in sigs],
         "messages_b64": [base64.b64encode(msg).decode()],
         "keripy": keripy_verdict([msg], icp.said),
+        "divergence": divergence,
     })
+
+
+def witnessed_case(label, why, expect, wits, toad, wsigs, divergence=""):
+    """An inception on one key with witnesses wits and threshold toad, carrying
+    witness-indexed signatures: a list of (witness, index, code)."""
+    a, e = fresh(), fresh()
+    icp = eventing.incept(keys=[a.verfer.qb64], isith="1", ndigs=[dig(e)], nsith="1",
+                          wits=[w.verfer.qb64 for w in wits], toad=toad,
+                          code=MtrDex.Blake3_256)
+    wigers = [indexing.Siger(raw=w.sign(icp.raw).raw, code=code, index=i)
+              for (w, i, code) in wsigs]
+    msg = bytes(eventing.messagize(icp, sigers=[a.sign(icp.raw, index=0)], wigers=wigers))
+    cases.append({
+        "label": label, "why": why, "expect": expect,
+        "codes": [wg.code for wg in wigers],
+        "messages_b64": [base64.b64encode(msg).decode()],
+        "keripy": keripy_verdict([msg], icp.said),
+        "divergence": divergence,
+    })
+
+
+def witness(tag):
+    """A non-transferable witness key pair."""
+    return signing.Signer(raw=bytes([tag]) * 32, transferable=False)
 
 
 def main():
@@ -234,6 +261,65 @@ def main():
          accepted, [o], "1", [dig(c), dig(d)], "2",
          [c, d], "1", [dig(e)], "1", [(c, 0, None, False), (c, 0, 0, False, "2A")],
          divergence=same_key_twice)
+
+    # One key written twice in a key list is two places, each opened honestly,
+    # so counting each signature once does not help: the list itself must be
+    # refused. keripy accepts both.
+    listed_twice = ("a key list naming one key twice is refused by keri-go; "
+                    "keripy accepts it and counts the key at both places")
+    a, e = fresh(), fresh()
+    icp_case("one-key-listed-twice", "k = [a, a], kt = 2; a signs at both places",
+             accepted, [a, a], "2", [dig(e)], "1", signing=[0, 1],
+             divergence=listed_twice)
+    o, c, e = fresh(), fresh(), fresh()
+    case("one-key-committed-twice",
+         "n = [H(c), H(c)], nt = 2; c alone opens both, as 2A(0,0) and 2A(0,1)",
+         accepted, [o], "1", [dig(c), dig(c)], "2",
+         [c], "1", [dig(e)], "1", [(c, 0, 0, False, "2A"), (c, 0, 1, False, "2A")],
+         divergence=listed_twice)
+
+    # Witness-indexed signatures. keripy counts one witness's signature twice
+    # when it is attached under two codes (the bytes are identical, so anyone
+    # holding the receipt can do it); keri-go counts each witness once.
+    A, B = indexing.IdrDex.Ed25519_Sig, indexing.IdrDex.Ed25519_Crt_Sig
+    w1, w2 = witness(0x31), witness(0x32)
+    witnessed_case("two-witnesses", "toad = 2 over [w1, w2]; both witnesses sign",
+                   accepted, [w1, w2], 2, [(w1, 0, A), (w2, 1, A)])
+    witnessed_case("one-witness-re-encoded", "toad = 2 over [w1, w2]; w1 alone, as A0 and B0",
+                   accepted, [w1, w2], 2, [(w1, 0, A), (w1, 0, B)],
+                   divergence=("one witness written in two spellings counts once in "
+                               "keri-go; keripy counts it twice"))
+    witnessed_case("one-witness", "toad = 2 over [w1, w2]; w1 alone, once",
+                   refused, [w1, w2], 2, [(w1, 0, A)])
+
+    # A rotation that cuts a witness and adds it back in the same event.
+    # keripy's builder refuses to write it, so it is written with w3 added and
+    # then w3 replaced by w1, with the identifier recomputed. Both refuse it.
+    o, c, e = fresh(), fresh(), fresh()
+    w3 = witness(0x33)
+    icp = eventing.incept(keys=[o.verfer.qb64], isith="1", ndigs=[dig(c)], nsith="1",
+                          wits=[w1.verfer.qb64, w2.verfer.qb64], toad=1,
+                          code=MtrDex.Blake3_256)
+    icp_msg = bytes(eventing.messagize(icp, sigers=[o.sign(icp.raw, index=0)],
+                                       wigers=[w1.sign(icp.raw, index=0)]))
+    honest = eventing.rotate(pre=icp.pre, keys=[c.verfer.qb64], dig=icp.said, sn=1,
+                             isith="1", ndigs=[dig(e)], nsith="1",
+                             wits=[w1.verfer.qb64, w2.verfer.qb64],
+                             cuts=[w1.verfer.qb64], adds=[w3.verfer.qb64], toad=2)
+    ked = dict(honest.ked)
+    ked["ba"] = [w1.verfer.qb64]
+    rot = serdering.SerderKERI(sad=ked, makify=True)
+    rot_msg = bytes(eventing.messagize(rot, sigers=[c.sign(rot.raw, index=0)],
+                                       wigers=[w2.sign(rot.raw, index=0),
+                                               w1.sign(rot.raw, index=1)]))
+    cases.append({
+        "label": "witness-cut-and-re-added",
+        "why": "br = [w1] and ba = [w1] in one rotation",
+        "expect": refused, "codes": ["A", "A"],
+        "messages_b64": [base64.b64encode(m).decode() for m in (icp_msg, rot_msg)],
+        "keripy": keripy_verdict([icp_msg, rot_msg], rot.said),
+        "divergence": "",
+    })
 
     # Every case must be judged by keripy as the case says, or the shape
     # tested is not the shape described.

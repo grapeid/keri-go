@@ -93,6 +93,10 @@ const (
 	// is, an entry that is not a canonical non-transferable identifier, or one
 	// witness named twice.
 	FaultWitnessListInvalid FaultKind = "witness-list-invalid"
+	// FaultKeyListInvalid is an establishment event that lists one signing key
+	// twice in k, or one next-key digest twice in n, so that one key could
+	// count twice toward a threshold.
+	FaultKeyListInvalid FaultKind = "key-list-invalid"
 	// FaultReceiptSignature is a receipt whose signature does not verify —
 	// including one whose signature or signer cannot be read at all, since in
 	// neither case has a witness vote been demonstrated.
@@ -634,6 +638,7 @@ func validateEvent(fs *faults, raw []byte) *Event {
 	}
 	checkThresholds(fs, ev)
 	checkWitnessIdentifiers(fs, ev)
+	checkKeyLists(fs, ev)
 	return ev
 }
 
@@ -983,7 +988,24 @@ func witnessKey(aid string) (string, error) {
 	return string(pub), nil
 }
 
+// checkWitnessChange holds a rotation's witness delta to the witnesses it
+// changes: a cut must name a current witness, an add must not, and no witness
+// may be both cut and added in one event. A cut-and-re-add changes nothing a
+// peer can see, and the reference refuses it ("Intersecting cuts and adds"), as
+// BuildRotation does; compared by key, as every witness comparison here is.
 func checkWitnessChange(fs *faults, ev *Event, current []string) {
+	cutKeys := make(map[string]bool, len(ev.WitnessCut))
+	for _, w := range ev.WitnessCut {
+		if k, err := witnessKey(w); err == nil {
+			cutKeys[k] = true
+		}
+	}
+	for _, w := range ev.WitnessAdd {
+		if k, err := witnessKey(w); err == nil && cutKeys[k] {
+			fs.add(FaultWitnessListInvalid, "the rotation both cuts and adds the witness "+
+				"%s, which keripy refuses as intersecting cuts and adds", w)
+		}
+	}
 	have := make(map[string]bool, len(current))
 	for _, w := range current {
 		have[w] = true

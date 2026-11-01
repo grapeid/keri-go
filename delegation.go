@@ -217,7 +217,7 @@ func BuildDelegatedInception(in DelegationInput) ([]byte, error) {
 		return nil, fmt.Errorf("a delegated inception derives its own identifier and cannot "+
 			"be told to use %s", in.Prefix)
 	}
-	if err := noDuplicates(in.Keys, "signing key"); err != nil {
+	if err := noRepeatedKeysOrDigests(in.Keys, in.NextDigests); err != nil {
 		return nil, err
 	}
 	if err := noDuplicateWitnesses(in.Witnesses, "witness"); err != nil {
@@ -327,6 +327,9 @@ func BuildDelegatedRotation(in DelegationInput) ([]byte, error) {
 
 	keys := emptyIfNil(in.Keys)
 	nexts := emptyIfNil(in.NextDigests)
+	if err := noRepeatedKeysOrDigests(keys, nexts); err != nil {
+		return nil, err
+	}
 
 	// Rendered by the rotation helper rather than re-derived. Same reasoning as
 	// the inception half above: one implementation of the hexadecimal and
