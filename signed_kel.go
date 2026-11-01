@@ -38,6 +38,10 @@ type SignedKELResult struct {
 	// to act on it before its witnesses have signed is the caller's
 	// decision. FullyWitnessed is the usual question to ask of it.
 	Witnessing []EventWitnessing
+
+	// states is the key state after each event, by sequence number: what
+	// State, StateAt and Admit read.
+	states []*KeyState
 }
 
 // EventWitnessing is what one event's witness-indexed signatures establish.
@@ -122,20 +126,9 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 
 	fs := &faults{}
 	var (
-		keys      []string
-		threshold *parsedThreshold
-		// priorNext and priorNextTh are the commitment of the last
-		// establishment event: what the next rotation must open. An
-		// interaction carries none, so it never changes them.
-		priorNext   []string
-		priorNextTh *parsedThreshold
-		// witnesses and toad are the witness state in force, which a
-		// witness-indexed signature's index points into.
-		witnesses []string
-		toad      uint64
-		result    SignedKELResult
+		state  *KeyState
+		result SignedKELResult
 	)
-
 	for i, raw := range events {
 		ev, err := ParseEvent(raw)
 		if err != nil {
@@ -144,48 +137,19 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 			// verifying part of the log.
 			return nil, fmt.Errorf("event %d became unreadable: %w", i, err)
 		}
-		if i == 0 {
-			result.Identifier = ev.Identifier
-		}
-
-		// An establishment event sets the state, and its own keys are the
-		// right thing to check its signatures against. What makes them more
-		// than self-asserted, for a rotation, is the check below that the keys
-		// which signed open enough of the previous commitment.
-		rotation := ev.Ilk == "rot" || ev.Ilk == "drt"
-		if ev.Establishment() {
-			keys = ev.Keys
-			threshold = ev.SigThreshold
-			if rotation {
-				witnesses = applyWitnessChange(witnesses, ev)
-			} else {
-				witnesses = append([]string(nil), ev.Witnesses...)
-			}
-			toad = ev.TOAD
-		}
-		result.Witnessing = append(result.Witnessing,
-			countWitnessSignatures(ev, attachments[i], witnesses, toad))
-		if len(keys) == 0 {
-			fs.add(FaultMalformed, "event %d (%s at sn %d) has no key state to check "+
-				"against, because no establishment event preceded it", i, ev.Ilk, ev.SN)
-			continue
-		}
-
 		fs.at(fmt.Sprintf("event %d (%s at sn %d)", i, ev.Ilk, ev.SN))
-		verified := verifyAgainstKeyState(fs, ev, attachments[i], keys, threshold)
-		if rotation {
-			checkPriorNextOpened(fs, ev, verified, priorNext, priorNextTh)
-		}
-		if ev.Establishment() {
-			priorNext, priorNextTh = ev.NextDigest, ev.NextThreshold
-		}
+		var w EventWitnessing
+		state, w = advance(fs, state, ev, attachments[i], true)
+		result.Witnessing = append(result.Witnessing, w)
+		result.states = append(result.states, state)
 	}
 
 	if err := fs.err(); err != nil {
 		return nil, err
 	}
-	result.Keys = keys
-	result.Threshold = threshold
+	result.Identifier = state.identifier
+	result.Keys = state.keys
+	result.Threshold = state.threshold
 	result.Events = len(events)
 	return &result, nil
 }

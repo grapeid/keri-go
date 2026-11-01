@@ -121,6 +121,10 @@ const (
 	// FaultThresholdNotMet is a signature set that does not meet the parsedThreshold
 	// the identity committed to.
 	FaultThresholdNotMet FaultKind = "parsedThreshold-not-met"
+	// FaultPlaceTaken is an event at a place a verified log already holds a
+	// different event at, which is not a recovery rotation that may replace
+	// it. Two such events, each correctly signed, are duplicity.
+	FaultPlaceTaken FaultKind = "place-taken"
 )
 
 // Fault is one reason something was refused.
@@ -831,15 +835,7 @@ func ValidateKEL(events [][]byte) error {
 		return fs.err()
 	}
 
-	var (
-		identifier   string
-		prior        *Event
-		priorNext    []string
-		priorNextTh  *parsedThreshold
-		witnesses    []string
-		haveEstabSet bool
-	)
-
+	var state *KeyState
 	for idx, raw := range events {
 		ev := validateEvent(fs, raw)
 		if ev == nil {
@@ -848,56 +844,7 @@ func ValidateKEL(events [][]byte) error {
 			return fs.err()
 		}
 		fs.at(fmt.Sprintf("event %d (%s at sn %d)", idx, ev.Ilk, ev.SN))
-
-		if idx == 0 {
-			if ev.Ilk != "icp" && ev.Ilk != "dip" {
-				fs.add(FaultMalformed, "a key history begins with an inception, and this "+
-					"one begins with a %s", ev.Ilk)
-			}
-			if ev.SN != 0 {
-				fs.add(FaultSequenceSkip, "an inception is at sequence number 0, and this "+
-					"one claims %d", ev.SN)
-			}
-			identifier = ev.Identifier
-		} else {
-			if ev.Ilk == "icp" || ev.Ilk == "dip" {
-				fs.add(FaultMalformed, "an identity is founded once, and this log carries a "+
-					"second inception at sequence number %d", ev.SN)
-			}
-			if ev.Identifier != identifier {
-				fs.add(FaultIdentifierMismatch, "this event belongs to %s and the log is the "+
-					"history of %s", ev.Identifier, identifier)
-			}
-			if ev.SN != prior.SN+1 {
-				fs.add(FaultSequenceSkip, "sequence number %d does not follow the prior "+
-					"event at %d, so an event has been inserted or dropped", ev.SN, prior.SN)
-			}
-			if ev.PriorSAID != prior.SAID {
-				fs.add(FaultPriorDigestMismatch, "this event digests its predecessor as %s "+
-					"but the previous event is %s, so it belongs to a different history",
-					ev.PriorSAID, prior.SAID)
-			}
-		}
-
-		if ev.Ilk == "rot" || ev.Ilk == "drt" {
-			if haveEstabSet {
-				checkPrecommitment(fs, ev, priorNext, priorNextTh)
-			}
-			checkWitnessChange(fs, ev, witnesses)
-			witnesses = applyWitnessChange(witnesses, ev)
-			if ev.HasTOAD && ev.TOAD > uint64(len(witnesses)) {
-				fs.add(FaultTOADExceedsWitnesses, "the rotation sets a witness parsedThreshold of "+
-					"%d against %d witnesses", ev.TOAD, len(witnesses))
-			}
-		}
-
-		if ev.Establishment() {
-			priorNext, priorNextTh, haveEstabSet = ev.NextDigest, ev.NextThreshold, true
-			if ev.Ilk == "icp" || ev.Ilk == "dip" {
-				witnesses = append([]string(nil), ev.Witnesses...)
-			}
-		}
-		prior = ev
+		state, _ = advance(fs, state, ev, nil, false)
 	}
 	return fs.err()
 }

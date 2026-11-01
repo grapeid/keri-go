@@ -71,7 +71,7 @@ that gap.
 | Key events | inception, rotation, interaction, delegated inception and rotation |
 | Thresholds | integer and fractional-weight, including nested weighted sets, for both current and next keys; `SatisfiesThreshold` answers whether signatures at given places meet one |
 | Witnesses | witness lists, thresholds, receipts, receipt streams |
-| Validation | key-log validation, signature verification against established key state, delegation authority |
+| Validation | key-log validation, signature verification against established key state, delegation authority; one event against the key state it follows (`VerifyEvent`), and an arriving event against a verified log (`Admit`: extends, repeats, or a recovery rotation over interactions, as keripy 1.3.6 decides it) |
 | Duplicity | detection of two conflicting events at one sequence number |
 | Credentials | ACDC credentials, registries, issuance, revocation, **edge-chain verification** |
 | Keys | generation, pre-rotation custody, encrypted-at-rest storage, an interface a hardware signer can satisfy |
