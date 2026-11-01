@@ -128,17 +128,21 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 }
 
 // verifyControllerSignatures checks an event's controller signatures against a
-// key list and returns the ones that verified, each at most once.
+// key list. It returns the ones that verified, each at most once, and how many
+// were dropped because they did not verify.
 //
 // The key list is the event's own for an establishment event and the key state
-// in force for an interaction; the caller decides which. A signature naming a
-// place outside the list, or one that does not verify, is a fault: it is not
-// evidence of anything, and a validator that dropped it silently would be
-// reporting on material it chose not to look at.
+// in force for an interaction; the caller decides which.
+//
+// A signature that does not verify is dropped and the rest are judged, as
+// keripy 1.3.6 does: it attests nothing, and it never counts toward any
+// threshold. Refusing the whole event over it would let anyone who passes the
+// event along make a valid event unverifiable by appending junk. A signature
+// naming a place outside the key list is still a fault, as it is in keripy,
+// and so is a key that cannot be read.
 func verifyControllerSignatures(fs *faults, ev *Event, groups []attachment,
-	keys []string) []indexedSig {
+	keys []string) (verified []indexedSig, dropped int) {
 
-	var verified []indexedSig
 	seen := make(map[string]bool)
 	for _, g := range groups {
 		if g.Counter != counterControllerIdxSigs {
@@ -164,15 +168,13 @@ func verifyControllerSignatures(fs *faults, ev *Event, groups []attachment,
 				continue
 			}
 			if !ed25519.Verify(pub, ev.Raw, sig.Raw) {
-				fs.add(FaultSignatureInvalid, "the signature attached for key %d (%s) "+
-					"does not verify over this event, so whoever produced it did not "+
-					"hold that key", sig.Index, keys[sig.Index])
+				dropped++
 				continue
 			}
 			verified = append(verified, sig)
 		}
 	}
-	return verified
+	return verified, dropped
 }
 
 // verifyAgainstKeyState checks an event's controller signatures against a key
@@ -180,20 +182,26 @@ func verifyControllerSignatures(fs *faults, ev *Event, groups []attachment,
 func verifyAgainstKeyState(fs *faults, ev *Event, groups []attachment,
 	keys []string, threshold *parsedThreshold) []indexedSig {
 
-	verified := verifyControllerSignatures(fs, ev, groups, keys)
+	verified, dropped := verifyControllerSignatures(fs, ev, groups, keys)
 	signed := make(map[int]bool, len(verified))
 	for _, sig := range verified {
 		signed[sig.Index] = true
 	}
+	// Said in the refusal, so a reader can tell a forgery from a short count.
+	unverified := ""
+	if dropped > 0 {
+		unverified = fmt.Sprintf("; %d attached signature(s) did not verify over this "+
+			"event and were not counted", dropped)
+	}
 	if len(signed) == 0 {
 		fs.add(FaultThresholdNotMet, "the event arrives with no controller signature "+
 			"that verifies under the keys it must be signed by, so nothing attests "+
-			"that its controller produced it")
+			"that its controller produced it%s", unverified)
 		return verified
 	}
 	if threshold != nil && !threshold.satisfiedBy(signed) {
 		fs.add(FaultThresholdNotMet, "%d of %d keys signed, which does not meet the "+
-			"signing threshold in force", len(signed), len(keys))
+			"signing threshold in force%s", len(signed), len(keys), unverified)
 	}
 	return verified
 }

@@ -283,3 +283,50 @@ func TestThresholdsRenderAsTheReferenceWritesThem(t *testing.T) {
 		}
 	}
 }
+
+// A signature that does not verify is dropped and the rest are judged, as
+// keripy does. Junk appended by whoever passed the event along cannot make a
+// valid event unverifiable, and a dropped signature never counts toward any
+// threshold.
+func TestASignatureThatDoesNotVerifyIsDroppedNotFatal(t *testing.T) {
+	a, c, d, e := newRotKey(t, 'a'), newRotKey(t, 'c'), newRotKey(t, 'd'), newRotKey(t, 'e')
+	icp, icpEv := foundedOn(t, []rotKey{a}, `"1"`, digestsOf(c, d), `"1"`)
+	rot := rotationOf(t, icpEv, 1, pubsOf(c, d), `"1"`, digestsOf(e), `"1"`)
+
+	// c signs properly; a signature made by a, claiming d's place, is junk.
+	withJunk := handMessage(t, rot, placedSig{key: c, code: "A", index: 0},
+		placedSig{key: a, code: "A", index: 1})
+	if _, err := ValidateSignedKEL([][]byte{icp, withJunk}); err != nil {
+		t.Fatalf("a valid rotation with one junk signature appended was refused: %v", err)
+	}
+	if err := ValidateStream(withJunk); err != nil {
+		t.Fatalf("ValidateStream refused a valid rotation over a junk signature: %v", err)
+	}
+
+	// Under kt 2 the junk signature would be the second one; dropped, it
+	// does not count, so the rotation falls short.
+	rot2 := rotationOf(t, icpEv, 1, pubsOf(c, d), `"2"`, digestsOf(e), `"1"`)
+	_, err := ValidateSignedKEL([][]byte{icp, handMessage(t, rot2,
+		placedSig{key: c, code: "A", index: 0}, placedSig{key: a, code: "A", index: 1})})
+	wantRefusedFor(t, err, FaultThresholdNotMet, "kt 2 met only by counting a junk signature")
+
+	// Nor does a junk signature open a prior commitment: here it claims n[1]
+	// under nt 2.
+	icp3, icp3Ev := foundedOn(t, []rotKey{a}, `"1"`, digestsOf(c, d), `"2"`)
+	rot3 := rotationOf(t, icp3Ev, 1, pubsOf(c, d), `"1"`, digestsOf(e), `"1"`)
+	_, err = ValidateSignedKEL([][]byte{icp3, handMessage(t, rot3,
+		placedSig{key: c, code: "A", index: 0}, placedSig{key: a, code: "A", index: 1})})
+	wantRefusedFor(t, err, FaultThresholdNotMet, "nt 2 met only by counting a junk signature")
+
+	// An interaction too.
+	ixn, err := BuildInteraction(InteractionInput{
+		Prefix: icpEv.Identifier, PriorSAID: icpEv.SAID, SN: 1, Data: []json.RawMessage{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ValidateSignedKEL([][]byte{icp, handMessage(t, ixn,
+		placedSig{key: a, code: "A", index: 0}, placedSig{key: c, code: "B", index: 0})}); err != nil {
+		t.Fatalf("a valid interaction with one junk signature appended was refused: %v", err)
+	}
+}

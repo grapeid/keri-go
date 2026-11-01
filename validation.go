@@ -108,7 +108,11 @@ const (
 	FaultStreamTruncated FaultKind = "stream-truncated"
 	// FaultStreamMalformed is attached material that is not readable CESR.
 	FaultStreamMalformed FaultKind = "stream-malformed"
-	// FaultSignatureInvalid is a controller signature that does not verify.
+	// FaultSignatureInvalid is a controller signature that names a key outside
+	// the key list, or whose key cannot be read. A signature that simply does
+	// not verify is dropped rather than reported: it attests nothing, the rest
+	// are judged without it, and if they fall short the refusal is
+	// FaultThresholdNotMet.
 	FaultSignatureInvalid FaultKind = "signature-invalid"
 	// FaultThresholdNotMet is a signature set that does not meet the parsedThreshold
 	// the identity committed to.

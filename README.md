@@ -138,11 +138,12 @@ one place in two spellings (A and B, or A and 2A) counts twice and can meet a
 two-key signing or prior-next threshold alone. keri-go counts each place once
 and refuses those logs.
 
-keriox judges 33 of the 41 cases as expected, including witness receipts,
+keriox judges 35 of the 45 cases as expected, including witness receipts,
 delegation, a credential registry, issuance and revocation, a whole key log
 published as a single stream, dual-index signatures and augmented rotations.
-The other eight carry nested weighted thresholds, which keriox does not read,
-so they are not put to it. That matters more than the keripy result, because keripy
+The other ten are not put to it: eight carry nested weighted thresholds, which
+keriox does not read, and two carry a signature that does not verify, which
+keriox refuses outright where keripy and keri-go drop it and judge the rest. That matters more than the keripy result, because keripy
 generated the vectors this was built against and keriox had no part in
 producing anything here.
 

@@ -65,6 +65,39 @@ func rotate(id identity, label, why, expect string, keys []string, kt string,
 	})
 }
 
+// rotateWithJunk is rotate, with one more signature appended that does not
+// verify: made by junkBy, but claiming the place of the key at junkAt.
+func rotateWithJunk(id identity, label, why, expect string, keys []string, kt string,
+	nexts []string, nt string, junkBy keri.Signer, junkAt int, signers ...keri.PlacedSigner) {
+
+	raw, err := keri.BuildRotation(keri.RotationInput{
+		Prefix: id.ev.Identifier, PriorSAID: id.ev.SAID, SN: 1,
+		Keys: keys, Isith: json.RawMessage(kt),
+		NextDigests: nexts, Nsith: json.RawMessage(nt),
+	})
+	must(err)
+	var sigs []string
+	for _, p := range signers {
+		sig, err := p.Signer.Sign(raw)
+		must(err)
+		q, err := keri.EncodeIndexedSignature(sig, p.At)
+		must(err)
+		sigs = append(sigs, q)
+	}
+	junk, err := junkBy.Sign(raw)
+	must(err)
+	q, err := keri.EncodeIndexedSignature(junk, keri.SamePlace(junkAt))
+	must(err)
+	attachment, err := keri.AttachControllerSigs(append(sigs, q))
+	must(err)
+	msg := append(append([]byte{}, raw...), attachment...)
+	cases = append(cases, kase{
+		Label: "rot/" + label, Kind: "kel", Why: why, Expect: expect,
+		Event: b64(raw), Msg: b64(msg),
+		KeriGo: kerigoVerdict([][]byte{id.icp, msg}),
+	})
+}
+
 func kerigoVerdict(log [][]byte) string {
 	if _, err := keri.ValidateSignedKEL(log); err != nil {
 		return "refused: " + err.Error()
@@ -162,6 +195,35 @@ func emitRotationShapes() {
 			"an augmented rotation signed by the added key alone, which opens nothing",
 			refused, pubs([]keri.Signer{c, added}), `"1"`, digests(after), `"1"`,
 			at(added, 1, 1))
+	}
+
+	// ---- a signature that does not verify -------------------------------
+	//
+	// Dropped and the rest judged, by both. It never counts: under kt = 2 it
+	// would have been the second signature. keriox refuses any event carrying
+	// such a signature, so these are not put to it.
+	firstJunk := len(cases)
+	{
+		owner, c, d, after := fresh(), fresh(), fresh(), fresh()
+		id := found("junk-signature", []keri.Signer{owner}, `"1"`, digests(c, d), `"1"`)
+		rotateWithJunk(id, "junk-signature",
+			"a valid rotation with a signature appended that does not verify",
+			accepted, pubs([]keri.Signer{c, d}), `"1"`, digests(after), `"1"`,
+			owner, 1, at(c, 0, 0))
+	}
+	{
+		owner, c, d, after := fresh(), fresh(), fresh(), fresh()
+		id := found("junk-signature-counted", []keri.Signer{owner}, `"1"`, digests(c, d), `"1"`)
+		rotateWithJunk(id, "junk-signature-counted",
+			"kt = 2 met only if the signature that does not verify were counted",
+			refused, pubs([]keri.Signer{c, d}), `"2"`, digests(after), `"1"`,
+			owner, 1, at(c, 0, 0))
+	}
+	for i := firstJunk; i < len(cases); i++ {
+		if cases[i].Label != "icp/junk-signature" && cases[i].Label != "icp/junk-signature-counted" {
+			cases[i].KerioxSkip = "keriox refuses an event carrying a signature that does " +
+				"not verify, where keripy and keri-go drop it"
+		}
 	}
 
 	// ---- two owners, both must act ----------------------------------------

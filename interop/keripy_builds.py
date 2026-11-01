@@ -194,6 +194,17 @@ def main():
           accepted, [0, 1, 2, 3, 4, 5], three2, three2,
           [(0, 0, 0), (1, 1, 1), (4, 4, 4), (5, 5, 5)])
 
+    # A signature that does not verify: made by the founding key, claiming
+    # d's place. Dropped and the rest judged; it never counts.
+    o, c, d, after = fresh(), fresh(), fresh(), fresh()
+    case("junk-signature", "a valid rotation plus a signature that does not verify",
+         accepted, [o], "1", [dig(c), dig(d)], "1",
+         [c, d], "1", [dig(after)], "1", [(c, 0, None, False), (o, 1, None, False)])
+    o, c, d, after = fresh(), fresh(), fresh(), fresh()
+    case("junk-signature-counted", "kt = 2 met only if the junk signature counted",
+         refused, [o], "1", [dig(c), dig(d)], "1",
+         [c, d], "2", [dig(after)], "1", [(c, 0, None, False), (o, 1, None, False)])
+
     # Thresholds keripy accepts that are easy to refuse by mistake: fewer
     # weights than keys (the extra keys weigh nothing, and one signing makes
     # the threshold unmet), and a next threshold of zero over commitments.
