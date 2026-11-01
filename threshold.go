@@ -269,7 +269,10 @@ func (t *parsedThreshold) exceeds(n int) (bool, string) {
 		}
 		return false, ""
 	}
-	if got := t.slots(); got != n {
+	// More weights than keys can never be met. Fewer is what the reference
+	// accepts: the keys beyond the last weight carry no weight, and a
+	// signature by one of them makes the threshold unmet (see satisfiedBy).
+	if got := t.slots(); got > n {
 		return true, fmt.Sprintf("the threshold gives %d weights for %d keys", got, n)
 	}
 	if err := t.reachable(); err != nil {

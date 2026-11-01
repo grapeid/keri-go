@@ -752,10 +752,12 @@ func checkThresholds(fs *faults, ev *Event) {
 		}
 	}
 	if ev.NextThreshold != nil && len(ev.NextDigest) > 0 {
-		// A next parsedThreshold of zero over no commitments is how an identity is
-		// abandoned, and is not a fault; a parsedThreshold over commitments that
-		// exist must be reachable.
-		if bad, why := ev.NextThreshold.exceeds(len(ev.NextDigest)); bad {
+		// A next threshold of zero is how an identity is abandoned, with or
+		// without commitments listed: no set of signatures meets zero, so no
+		// rotation can follow. keripy accepts the event that says so, and so
+		// does this. Any other next threshold must be reachable.
+		zeroCount := !ev.NextThreshold.weighted && ev.NextThreshold.count == 0
+		if bad, why := ev.NextThreshold.exceeds(len(ev.NextDigest)); bad && !zeroCount {
 			fs.add(FaultThresholdExceedsKeys, "the next-key parsedThreshold could never be met: %s", why)
 		}
 	}

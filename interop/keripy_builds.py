@@ -86,6 +86,22 @@ def case(label, why, expect, icp_keys, isith, ndigs, nsith, rot_keys, rsith,
     })
 
 
+def icp_case(label, why, expect, keys, isith, ndigs, nsith, signing=None):
+    """An inception alone, signed by the keys at the places in signing
+    (default: every key at its own place)."""
+    icp = eventing.incept(keys=[s.verfer.qb64 for s in keys], isith=isith,
+                          ndigs=ndigs, nsith=nsith, code=MtrDex.Blake3_256)
+    places = range(len(keys)) if signing is None else signing
+    sigs = [keys[i].sign(icp.raw, index=i) for i in places]
+    msg = bytes(eventing.messagize(icp, sigers=sigs))
+    cases.append({
+        "label": label, "why": why, "expect": expect,
+        "codes": [sg.code for sg in sigs],
+        "messages_b64": [base64.b64encode(msg).decode()],
+        "keripy": keripy_verdict([msg], icp.said),
+    })
+
+
 def main():
     accepted, refused = "accepted", "refused"
 
@@ -169,6 +185,19 @@ def main():
     three("three-owners-stage-two", "owners 0 and 2, both keys each, nested kt",
           accepted, [0, 1, 2, 3, 4, 5], three2, three2,
           [(0, 0, 0), (1, 1, 1), (4, 4, 4), (5, 5, 5)])
+
+    # Thresholds keripy accepts that are easy to refuse by mistake: fewer
+    # weights than keys (the extra keys weigh nothing, and one signing makes
+    # the threshold unmet), and a next threshold of zero over commitments.
+    a, b, c, e = fresh(), fresh(), fresh(), fresh()
+    icp_case("fewer-weights-than-keys", "three keys, kt [1/2, 1/2], the first two sign",
+             accepted, [a, b, c], ["1/2", "1/2"], [dig(e)], "1", signing=[0, 1])
+    a, b, c, e = fresh(), fresh(), fresh(), fresh()
+    icp_case("unweighted-key-signs", "three keys, kt [1/2, 1/2], all three sign",
+             refused, [a, b, c], ["1/2", "1/2"], [dig(e)], "1")
+    a, e = fresh(), fresh()
+    icp_case("next-threshold-zero", "nt 0 over one commitment: abandoned at founding",
+             accepted, [a], "1", [dig(e)], "0")
 
     # Every case must be judged by keripy as the case says, or the shape
     # tested is not the shape described.
