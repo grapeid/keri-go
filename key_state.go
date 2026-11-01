@@ -258,6 +258,17 @@ func readMessage(message []byte) (*Event, []attachment, *faults, error) {
 	return ev, groups, fs, nil
 }
 
+// thresholdCopy is a copy of t for a result's Threshold, so a caller writing
+// through it cannot change the threshold a state verifies against. Its parts
+// are unexported, so only the struct itself can be written.
+func thresholdCopy(t *parsedThreshold) *parsedThreshold {
+	if t == nil {
+		return nil
+	}
+	c := *t
+	return &c
+}
+
 // splitMessage splits an event from its attachments, as it travels.
 func splitMessage(message []byte) ([]byte, []attachment, error) {
 	raw, attached, err := splitStream(message)
@@ -309,7 +320,9 @@ type Admission struct {
 // with it verifies against the key state and witnesses at its place, as keripy
 // 1.3.6 logs a duplicate: a repeat need not meet the signing threshold again,
 // since the log already holds the event, and that is how late witness
-// signatures arrive. One with no signature that verifies is refused.
+// signatures arrive. The witnesses that signed it are counted in Log. One with
+// no signature that verifies is refused, and so is one carrying a controller
+// signature that names a place outside the key list, as keripy refuses it.
 //
 // An event at a place past the end of the log is refused as out of order; one
 // whose predecessor has not arrived cannot be judged.
@@ -364,7 +377,7 @@ func (r *SignedKELResult) admitAt(fs *faults, ev *Event, groups []attachment,
 	log := &SignedKELResult{
 		Identifier: r.Identifier,
 		Keys:       got.state.Keys(),
-		Threshold:  got.state.threshold,
+		Threshold:  thresholdCopy(got.state.threshold),
 		Events:     keep + 1,
 		Witnessing: append(append([]EventWitnessing(nil), r.Witnessing[:keep]...),
 			got.witnessing),
@@ -394,8 +407,32 @@ func (r *SignedKELResult) repeat(fs *faults, ev *Event, groups []attachment,
 	return &Admission{
 		Verified: Verified{State: held, Witnessing: w,
 			Signatures: signatureTexts(verified)},
-		Repeat: true, Log: r,
+		Repeat: true, Log: r.withWitnesses(held.sn, w),
 	}, nil
+}
+
+// withWitnesses is r with the witnesses that signed w's event again counted
+// for it too, each witness once, so a log collecting late witness signatures
+// becomes fully witnessed.
+func (r *SignedKELResult) withWitnesses(sn uint64, w EventWitnessing) *SignedKELResult {
+	was := r.Witnessing[sn]
+	signed := make(map[string]bool, len(was.Signed)+len(w.Signed))
+	for _, name := range append(append([]string(nil), was.Signed...), w.Signed...) {
+		signed[name] = true
+	}
+	merged := was
+	merged.Signed = nil
+	for _, name := range was.Witnesses {
+		if signed[name] {
+			merged.Signed = append(merged.Signed, name)
+		}
+	}
+	merged.Met = uint64(len(merged.Signed)) >= merged.Threshold
+	out := *r
+	out.Keys = append([]string(nil), r.Keys...)
+	out.Witnessing = append([]EventWitnessing(nil), r.Witnessing...)
+	out.Witnessing[sn] = merged
+	return &out
 }
 
 func whyNotRecovery(ev *Event, tip *KeyState) string {

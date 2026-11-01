@@ -147,7 +147,7 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 	// A copy, so a caller that sorts or rewrites Keys cannot change the state
 	// that State, StateAt and Admit verify against.
 	result.Keys = state.Keys()
-	result.Threshold = state.threshold
+	result.Threshold = thresholdCopy(state.threshold)
 	result.Events = len(events)
 	return &result, nil
 }

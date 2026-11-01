@@ -436,8 +436,9 @@ func TestARepeatCarryingOnlyAWitnessSignatureIsAdmitted(t *testing.T) {
 		t.Fatalf("the repeat reported repeat=%v witnesses=%v controller=%v",
 			adm.Repeat, adm.Witnessing.Signed, adm.Signatures)
 	}
-	if adm.Log != r {
-		t.Error("a repeat changed the log")
+	if adm.Log.Events != r.Events || len(adm.Log.Witnessing[0].Signed) != 1 ||
+		len(r.Witnessing[0].Signed) != 0 {
+		t.Error("a repeat changed the log's events, or did not count its witness only in Log")
 	}
 
 	stranger := newWitness(t, 9)
@@ -498,4 +499,36 @@ func TestAResultsKeysAreACopy(t *testing.T) {
 	}
 	_, err = r.Admit(h.sign(raw, stranger.Signers()...))
 	faultKind(t, err, FaultThresholdNotMet)
+}
+
+// Late witness signatures taken on repeats are counted in the log, so a log
+// collecting them one witness at a time becomes fully witnessed.
+func TestLateWitnessSignaturesAreCountedInTheLog(t *testing.T) {
+	a, e, w1, w2 := newRotKey(t, 'a'), newRotKey(t, 'e'), newWitness(t, 1), newWitness(t, 2)
+	icp, msg, _ := witnessedInception(t, a, digestsOf(e), []rotKey{w1, w2}, 2)
+	r := witnessingOf(t, msg)
+	if r.FullyWitnessed() {
+		t.Fatal("the test's log is witnessed before any witness signed")
+	}
+	first, err := r.Admit(withWitnessSigs(t, icp, icp, placedSig{key: w1, code: "A", index: 0}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Log.FullyWitnessed() || len(first.Log.Witnessing[0].Signed) != 1 {
+		t.Fatalf("after one witness the log reports %+v", first.Log.Witnessing[0])
+	}
+	again, err := first.Log.Admit(withWitnessSigs(t, icp, icp, placedSig{key: w1, code: "A", index: 0}))
+	if err != nil || len(again.Log.Witnessing[0].Signed) != 1 {
+		t.Fatal("one witness signing twice was counted twice")
+	}
+	second, err := first.Log.Admit(withWitnessSigs(t, icp, icp, placedSig{key: w2, code: "A", index: 1}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !second.Log.FullyWitnessed() {
+		t.Fatalf("after both witnesses the log reports %+v", second.Log.Witnessing[0])
+	}
+	if r.FullyWitnessed() || len(r.Witnessing[0].Signed) != 0 {
+		t.Error("admitting a repeat changed the log it was admitted to")
+	}
 }
