@@ -44,6 +44,10 @@ type KeyState struct {
 
 	witnesses []string
 	toad      uint64
+
+	// delegated is whether the identity was founded by a delegated inception,
+	// which decides the only kind of rotation it may make.
+	delegated bool
 }
 
 // Identifier is the identity this state belongs to.
@@ -75,6 +79,17 @@ func (s *KeyState) Witnesses() []string { return append([]string(nil), s.witness
 // TOAD is the witness threshold in force.
 func (s *KeyState) TOAD() uint64 { return s.toad }
 
+// Delegated is whether the identity was founded by a delegated inception.
+func (s *KeyState) Delegated() bool { return s.delegated }
+
+// step is what advance found for one event.
+type step struct {
+	state      *KeyState
+	witnessing EventWitnessing
+	// signatures are the controller signatures that verified, as attached.
+	signatures []string
+}
+
 // advance applies ev, which is to follow prev (nil for the first event of a
 // log), and returns the state after it. Every fault goes to fs; the state is
 // returned whatever was found, so a caller folding a log can report the faults
@@ -85,7 +100,7 @@ func (s *KeyState) TOAD() uint64 { return s.toad }
 // signatures against the key state in force and counts the witness signatures,
 // which is ValidateSignedKEL's.
 func advance(fs *faults, prev *KeyState, ev *Event, groups []attachment,
-	signed bool) (*KeyState, EventWitnessing) {
+	signed bool) step {
 
 	st := &KeyState{}
 	if prev == nil {
@@ -98,6 +113,7 @@ func advance(fs *faults, prev *KeyState, ev *Event, groups []attachment,
 				"one claims %d", ev.SN)
 		}
 		st.identifier = ev.Identifier
+		st.delegated = ev.Ilk == "dip"
 	} else {
 		*st = *prev
 		if ev.Ilk == "icp" || ev.Ilk == "dip" {
@@ -121,6 +137,18 @@ func advance(fs *faults, prev *KeyState, ev *Event, groups []attachment,
 	st.sn, st.digest, st.ilk = ev.SN, ev.SAID, ev.Ilk
 
 	rotation := ev.Ilk == "rot" || ev.Ilk == "drt"
+	// keripy 1.3.6 refuses a plain rotation of a delegated identity, which
+	// would take it over without its delegator's approval. A delegated
+	// rotation of an identity nobody delegated is refused too, which keripy
+	// leaves to its delegation check: there is no delegator to approve it.
+	if prev != nil && ev.Ilk == "rot" && prev.delegated {
+		fs.add(FaultMalformed, "the identity was founded by a delegated inception, so it "+
+			"rotates only by a delegated rotation its delegator approves, and this is a rot")
+	}
+	if prev != nil && ev.Ilk == "drt" && !prev.delegated {
+		fs.add(FaultMalformed, "the identity was not founded by a delegated inception, so "+
+			"no delegator can approve a delegated rotation of it")
+	}
 	if rotation {
 		if prev != nil && prev.established {
 			checkPrecommitment(fs, ev, prev.next, prev.nextThreshold)
@@ -146,19 +174,18 @@ func advance(fs *faults, prev *KeyState, ev *Event, groups []attachment,
 		st.toad = ev.TOAD
 	}
 
-	var w EventWitnessing
 	if !signed {
-		return st, w
+		return step{state: st}
 	}
 	// An establishment event's own keys are the right thing to check its
 	// signatures against. What makes them more than self-asserted, for a
 	// rotation, is that the keys which signed open enough of the previous
 	// commitment.
-	w = countWitnessSignatures(ev, groups, st.witnesses, st.toad)
+	w := countWitnessSignatures(ev, groups, st.witnesses, st.toad)
 	if len(st.keys) == 0 {
 		fs.add(FaultMalformed, "the %s at sn %d has no key state to check against, "+
 			"because no establishment event preceded it", ev.Ilk, ev.SN)
-		return st, w
+		return step{state: st, witnessing: w}
 	}
 	verified := verifyAgainstKeyState(fs, ev, groups, st.keys, st.threshold)
 	if rotation {
@@ -169,7 +196,15 @@ func advance(fs *faults, prev *KeyState, ev *Event, groups []attachment,
 		}
 		checkPriorNextOpened(fs, ev, verified, committed, th)
 	}
-	return st, w
+	return step{state: st, witnessing: w, signatures: signatureTexts(verified)}
+}
+
+func signatureTexts(sigs []indexedSig) []string {
+	out := make([]string, 0, len(sigs))
+	for _, sig := range sigs {
+		out = append(out, sig.QB64)
+	}
+	return out
 }
 
 // Verified is one event verified against the key state it follows.
@@ -179,6 +214,9 @@ type Verified struct {
 	// Witnessing is what the event's witness-indexed signatures establish.
 	// It is reported and not enforced, as in ValidateSignedKEL.
 	Witnessing EventWitnessing
+	// Signatures are the attached controller signatures that verified, each
+	// once, as attached. One that did not verify is not among them.
+	Signatures []string
 }
 
 // VerifyEvent checks one event, with its attachments as it travels, against the
@@ -199,28 +237,38 @@ func VerifyEvent(state *KeyState, message []byte) (*Verified, error) {
 	if ev == nil {
 		return nil, fs.err()
 	}
-	next, w := advance(fs, state, ev, groups, true)
+	got := advance(fs, state, ev, groups, true)
 	if err := fs.err(); err != nil {
 		return nil, err
 	}
-	return &Verified{State: next, Witnessing: w}, nil
+	return &Verified{State: got.state, Witnessing: got.witnessing,
+		Signatures: got.signatures}, nil
 }
 
 // readMessage splits an event from its attachments and checks what can be
 // decided from the event alone. ev is nil when the bytes are not an event, and
 // the reason is in fs.
 func readMessage(message []byte) (*Event, []attachment, *faults, error) {
-	raw, attached, err := splitStream(message)
+	raw, groups, err := splitMessage(message)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("not an event with attachments: %w", err)
-	}
-	groups, err := parseAttachments(attached)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unreadable attachments: %w", err)
+		return nil, nil, nil, err
 	}
 	fs := &faults{}
 	ev := validateEvent(fs, raw)
 	return ev, groups, fs, nil
+}
+
+// splitMessage splits an event from its attachments, as it travels.
+func splitMessage(message []byte) ([]byte, []attachment, error) {
+	raw, attached, err := splitStream(message)
+	if err != nil {
+		return nil, nil, fmt.Errorf("not an event with attachments: %w", err)
+	}
+	groups, err := parseAttachments(attached)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unreadable attachments: %w", err)
+	}
+	return raw, groups, nil
 }
 
 // Admission is an event judged against a verified log it arrived for.
@@ -230,11 +278,17 @@ type Admission struct {
 	// replaces: zero when it extends the log, and for a recovery rotation the
 	// interactions after the event it follows.
 	Supersedes int
-	// Repeat is whether the log already holds this event at its place. Nothing
-	// changes; Witnessing says what the attachments given with it establish,
-	// so a witness's or a further controller's signature can still be taken
-	// from it.
+	// Repeat is whether the log already holds this event at its place.
+	// Nothing about the log changes. Signatures and Witnessing say which of
+	// the signatures given with it verify, so a late witness signature or a
+	// further controller signature can be kept; State is the state at the
+	// event's own place, which for a repeat of an earlier event is not the end
+	// of the log.
 	Repeat bool
+	// Log is the verified log with this event admitted: extended, with the
+	// superseded interactions replaced, or unchanged for a repeat. Admit it
+	// the next event, rather than verifying the whole log again.
+	Log *SignedKELResult
 }
 
 // Admit judges an event that arrives for the identity whose log r is: whether
@@ -247,8 +301,15 @@ type Admission struct {
 // is an interaction: one that would replace an establishment event is refused,
 // and the first establishment event seen at a place stands. That is keripy
 // 1.3.6's rule for a non-delegated identity. A delegated rotation at a taken
-// place is refused here: whether it may supersede turns on its delegator's log,
-// which this does not have.
+// place is refused here, where keripy may accept one under its delegation
+// rules: whether it may supersede turns on its delegator's log, which this does
+// not have.
+//
+// A repeat is admitted when at least one controller or witness signature given
+// with it verifies against the key state and witnesses at its place, as keripy
+// 1.3.6 logs a duplicate: a repeat need not meet the signing threshold again,
+// since the log already holds the event, and that is how late witness
+// signatures arrive. One with no signature that verifies is refused.
 //
 // An event at a place past the end of the log is refused as out of order; one
 // whose predecessor has not arrived cannot be judged.
@@ -265,38 +326,76 @@ func (r *SignedKELResult) Admit(message []byte) (*Admission, error) {
 	}
 	tip := r.states[len(r.states)-1]
 
-	var prev *KeyState
-	supersedes, repeat := 0, false
 	switch {
 	case ev.SN > tip.sn+1:
 		fs.add(FaultSequenceSkip, "the log ends at sequence number %d, so an event at %d "+
 			"cannot be judged until the events before it arrive", tip.sn, ev.SN)
 		return nil, fs.err()
 	case ev.SN == tip.sn+1:
-		prev = tip
-	default:
-		if ev.SN > 0 {
-			prev = r.states[ev.SN-1]
-		}
-		held := r.states[ev.SN]
-		switch {
-		case held.digest == ev.SAID:
-			repeat = true
-		case ev.Ilk == "rot" && ev.SN > tip.establishment:
-			supersedes = int(tip.sn - ev.SN + 1)
-		default:
-			fs.add(FaultPlaceTaken, "the log already holds %s (a %s) at sequence number "+
-				"%d, and %s", held.digest, held.ilk, ev.SN, whyNotRecovery(ev, tip))
-			return nil, fs.err()
-		}
+		return r.admitAt(fs, ev, groups, 0)
 	}
+	held := r.states[ev.SN]
+	switch {
+	case held.digest == ev.SAID:
+		return r.repeat(fs, ev, groups, held)
+	case ev.Ilk == "rot" && ev.SN > tip.establishment:
+		return r.admitAt(fs, ev, groups, int(tip.sn-ev.SN+1))
+	default:
+		fs.add(FaultPlaceTaken, "the log already holds %s (a %s) at sequence number "+
+			"%d, and %s", held.digest, held.ilk, ev.SN, whyNotRecovery(ev, tip))
+		return nil, fs.err()
+	}
+}
 
-	next, w := advance(fs, prev, ev, groups, true)
+// admitAt verifies ev after the event before its place, replacing the last
+// supersedes events of the log.
+func (r *SignedKELResult) admitAt(fs *faults, ev *Event, groups []attachment,
+	supersedes int) (*Admission, error) {
+
+	var prev *KeyState
+	if ev.SN > 0 {
+		prev = r.states[ev.SN-1]
+	}
+	got := advance(fs, prev, ev, groups, true)
 	if err := fs.err(); err != nil {
 		return nil, err
 	}
-	return &Admission{Verified: Verified{State: next, Witnessing: w},
-		Supersedes: supersedes, Repeat: repeat}, nil
+	keep := len(r.states) - supersedes
+	log := &SignedKELResult{
+		Identifier: r.Identifier,
+		Keys:       got.state.Keys(),
+		Threshold:  got.state.threshold,
+		Events:     keep + 1,
+		Witnessing: append(append([]EventWitnessing(nil), r.Witnessing[:keep]...),
+			got.witnessing),
+		states: append(append([]*KeyState(nil), r.states[:keep]...), got.state),
+	}
+	return &Admission{
+		Verified: Verified{State: got.state, Witnessing: got.witnessing,
+			Signatures: got.signatures},
+		Supersedes: supersedes, Log: log,
+	}, nil
+}
+
+// repeat judges the signatures given with an event the log already holds.
+func (r *SignedKELResult) repeat(fs *faults, ev *Event, groups []attachment,
+	held *KeyState) (*Admission, error) {
+
+	verified, _ := verifyControllerSignatures(fs, ev, groups, held.keys)
+	w := countWitnessSignatures(ev, groups, held.witnesses, held.toad)
+	if err := fs.err(); err != nil {
+		return nil, err
+	}
+	if len(verified) == 0 && len(w.Signed) == 0 {
+		fs.add(FaultThresholdNotMet, "the log holds this event, and no controller or "+
+			"witness signature given with it again verifies, so it adds nothing")
+		return nil, fs.err()
+	}
+	return &Admission{
+		Verified: Verified{State: held, Witnessing: w,
+			Signatures: signatureTexts(verified)},
+		Repeat: true, Log: r,
+	}, nil
 }
 
 func whyNotRecovery(ev *Event, tip *KeyState) string {
@@ -306,7 +405,8 @@ func whyNotRecovery(ev *Event, tip *KeyState) string {
 			"the last establishment event, at sequence number %d", tip.establishment)
 	case "drt":
 		return "whether a delegated rotation may replace it turns on the delegator's " +
-			"log, which this does not have"
+			"log, which this does not have; keripy may accept one under its delegation " +
+			"rules, so this is not by itself duplicity"
 	default:
 		return fmt.Sprintf("only a rotation may replace an event the log holds, and this "+
 			"is a %s", ev.Ilk)

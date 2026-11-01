@@ -106,13 +106,9 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 	events := make([][]byte, 0, len(messages))
 	attachments := make([][]attachment, 0, len(messages))
 	for i, msg := range messages {
-		raw, attached, err := splitStream(msg)
+		raw, groups, err := splitMessage(msg)
 		if err != nil {
-			return nil, fmt.Errorf("message %d is not an event with attachments: %w", i, err)
-		}
-		groups, err := parseAttachments(attached)
-		if err != nil {
-			return nil, fmt.Errorf("message %d has unreadable attachments: %w", i, err)
+			return nil, fmt.Errorf("message %d is %w", i, err)
 		}
 		events = append(events, raw)
 		attachments = append(attachments, groups)
@@ -138,9 +134,9 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 			return nil, fmt.Errorf("event %d became unreadable: %w", i, err)
 		}
 		fs.at(fmt.Sprintf("event %d (%s at sn %d)", i, ev.Ilk, ev.SN))
-		var w EventWitnessing
-		state, w = advance(fs, state, ev, attachments[i], true)
-		result.Witnessing = append(result.Witnessing, w)
+		got := advance(fs, state, ev, attachments[i], true)
+		state = got.state
+		result.Witnessing = append(result.Witnessing, got.witnessing)
 		result.states = append(result.states, state)
 	}
 
@@ -148,7 +144,9 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 		return nil, err
 	}
 	result.Identifier = state.identifier
-	result.Keys = state.keys
+	// A copy, so a caller that sorts or rewrites Keys cannot change the state
+	// that State, StateAt and Admit verify against.
+	result.Keys = state.Keys()
 	result.Threshold = state.threshold
 	result.Events = len(events)
 	return &result, nil

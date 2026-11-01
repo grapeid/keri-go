@@ -123,7 +123,10 @@ const (
 	FaultThresholdNotMet FaultKind = "parsedThreshold-not-met"
 	// FaultPlaceTaken is an event at a place a verified log already holds a
 	// different event at, which is not a recovery rotation that may replace
-	// it. Two such events, each correctly signed, are duplicity.
+	// it. Two such events, each correctly signed, are duplicity, except where
+	// the second is a delegated rotation: that is refused because whether it
+	// may replace the first turns on the delegator's log, not because it is
+	// duplicitous.
 	FaultPlaceTaken FaultKind = "place-taken"
 )
 
@@ -844,7 +847,7 @@ func ValidateKEL(events [][]byte) error {
 			return fs.err()
 		}
 		fs.at(fmt.Sprintf("event %d (%s at sn %d)", idx, ev.Ilk, ev.SN))
-		state, _ = advance(fs, state, ev, nil, false)
+		state = advance(fs, state, ev, nil, false).state
 	}
 	return fs.err()
 }

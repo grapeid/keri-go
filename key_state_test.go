@@ -375,3 +375,127 @@ func TestAdmitRefusesAnEventPastTheEnd(t *testing.T) {
 	_, err = r.Admit(h.messages[2])
 	faultKind(t, err, FaultSequenceSkip)
 }
+
+// A delegated identity rotates only by a delegated rotation, as keripy 1.3.6
+// holds it: a plain rotation would take it over, or replace its interactions,
+// without its delegator's approval.
+func TestADelegatedIdentityIsNotRotatedByAPlainRotation(t *testing.T) {
+	a, e := newRotKey(t, 'a'), newRotKey(t, 'e')
+	dip, err := BuildDelegatedInception(DelegationInput{Delegator: testDelegator,
+		Keys: pubsOf(a), NextDigests: digestsOf(e)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dipEv, err := ParseEvent(dip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dipMsg := handMessage(t, dip, placedSig{key: a, code: "A", index: 0})
+	ixn, err := BuildInteraction(InteractionInput{Prefix: dipEv.Identifier,
+		PriorSAID: dipEv.SAID, SN: 1, Data: []json.RawMessage{json.RawMessage(`{}`)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ixnMsg := handMessage(t, ixn, placedSig{key: a, code: "A", index: 0})
+	r, err := ValidateSignedKEL([][]byte{dipMsg, ixnMsg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.State().Delegated() {
+		t.Fatal("a delegated identity's state does not say it is delegated")
+	}
+
+	rot, err := BuildRotation(RotationInput{Prefix: dipEv.Identifier, Keys: pubsOf(e),
+		PriorSAID: dipEv.SAID, SN: 1, NextDigests: digestsOf(a)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rotMsg := handMessage(t, rot, placedSig{key: e, code: "A", index: 0})
+	_, err = r.Admit(rotMsg)
+	faultKind(t, err, FaultMalformed)
+	_, err = VerifyEvent(r.StateAt(0), rotMsg)
+	faultKind(t, err, FaultMalformed)
+	if _, err := ValidateSignedKEL([][]byte{dipMsg, rotMsg}); err == nil {
+		t.Fatal("the whole log accepted a plain rotation of a delegated identity")
+	}
+}
+
+// A repeat carrying only a witness's signature is admitted, so late witness
+// signatures can be kept; one carrying nothing that verifies is refused.
+func TestARepeatCarryingOnlyAWitnessSignatureIsAdmitted(t *testing.T) {
+	a, e, w1, w2 := newRotKey(t, 'a'), newRotKey(t, 'e'), newWitness(t, 1), newWitness(t, 2)
+	icp, msg, _ := witnessedInception(t, a, digestsOf(e), []rotKey{w1, w2}, 2)
+	r := witnessingOf(t, msg)
+
+	late := withWitnessSigs(t, icp, icp, placedSig{key: w1, code: "A", index: 0})
+	adm, err := r.Admit(late)
+	if err != nil {
+		t.Fatalf("a repeat carrying a witness signature was refused: %v", err)
+	}
+	if !adm.Repeat || len(adm.Witnessing.Signed) != 1 || len(adm.Signatures) != 0 {
+		t.Fatalf("the repeat reported repeat=%v witnesses=%v controller=%v",
+			adm.Repeat, adm.Witnessing.Signed, adm.Signatures)
+	}
+	if adm.Log != r {
+		t.Error("a repeat changed the log")
+	}
+
+	stranger := newWitness(t, 9)
+	junk := withWitnessSigs(t, icp, icp, placedSig{key: stranger, code: "A", index: 0})
+	_, err = r.Admit(junk)
+	faultKind(t, err, FaultThresholdNotMet)
+}
+
+// Admission.Log is the log with the event admitted, so the next event is
+// admitted to it without verifying the whole log again.
+func TestEachAdmissionIsAdmittedToTheLogBefore(t *testing.T) {
+	h := newHistory(t)
+	r := h.verified()
+	for sn := 1; sn <= 3; sn++ {
+		msg := h.interaction(sn, `{"i":"EA","s":"0","d":"EA"}`)
+		adm, err := r.Admit(msg)
+		if err != nil {
+			t.Fatalf("interaction %d was refused: %v", sn, err)
+		}
+		h.messages = append(h.messages, msg)
+		h.saids = append(h.saids, mustSAID(t, msg))
+		r = adm.Log
+	}
+	adm, err := r.Admit(h.rotation(2))
+	if err != nil {
+		t.Fatalf("a recovery rotation was refused: %v", err)
+	}
+	if adm.Supersedes != 2 || adm.Log.Events != 3 || adm.Log.State().Ilk() != "rot" ||
+		len(adm.Log.Witnessing) != 3 {
+		t.Fatalf("after recovery the log holds %d events ending in a %s",
+			adm.Log.Events, adm.Log.State().Ilk())
+	}
+	if len(adm.Signatures) != 1 {
+		t.Fatalf("the rotation reports %d verified signatures", len(adm.Signatures))
+	}
+	if r.Events != 4 {
+		t.Error("admitting to a log changed the log it was admitted to")
+	}
+}
+
+// Rewriting a result's Keys does not change what it verifies against.
+func TestAResultsKeysAreACopy(t *testing.T) {
+	h := newHistory(t)
+	r := h.verified()
+	stranger, err := NewKeychain(NewMemoryKeyStore(), "stranger", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := stranger.CurrentKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Keys[0] = keys[0]
+	raw, err := BuildInteraction(InteractionInput{Prefix: h.prefix,
+		PriorSAID: h.saids[0], SN: 1, Data: []json.RawMessage{json.RawMessage(`{}`)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.Admit(h.sign(raw, stranger.Signers()...))
+	faultKind(t, err, FaultThresholdNotMet)
+}
