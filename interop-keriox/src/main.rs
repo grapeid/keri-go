@@ -53,6 +53,12 @@ struct Case {
     skipped: String,
     #[serde(default)]
     issuer: String,
+    /// "refused" for a case that must be refused; empty means accepted.
+    #[serde(default)]
+    expect: String,
+    /// Why keriox is not asked to judge this case, when it is not.
+    #[serde(default)]
+    keriox_skip: String,
 }
 
 fn decode(s: &str) -> Vec<u8> {
@@ -85,6 +91,11 @@ fn main() {
     for case in &cases {
         if !case.skipped.is_empty() {
             println!("  SKIPPED  {:30} {}", case.label, case.skipped);
+            skipped += 1;
+            continue;
+        }
+        if !case.keriox_skip.is_empty() {
+            println!("  NOT ASKED {:29} {}", case.label, case.keriox_skip);
             skipped += 1;
             continue;
         }
@@ -173,6 +184,7 @@ fn main() {
         // carries no attachments, and cesrox is a stream parser: handed one, it
         // reports it cannot read it, which looks identical to a malformed event
         // and is not.
+        let must_refuse = case.expect == "refused";
         let (id, want_sn) = match parse(&decode(&case.message_b64))
             .ok()
             .and_then(|(_, p)| Message::try_from(p).ok())
@@ -183,6 +195,8 @@ fn main() {
             ),
             _ => {
                 let why = err.unwrap_or_else(|| "no diagnosis".into());
+                // A case that must be refused is not refused correctly by
+                // being unreadable: that says nothing about its signatures.
                 println!(
                     "  REFUSED  {:30} keriox could not read it: {}",
                     case.label, why
@@ -198,21 +212,35 @@ fn main() {
         // earlier event was accepted — so a refused rotation reads as accepted
         // because the inception before it is still there. That mistake was made
         // here first and caught by a mutation that should have failed and did not.
-        match storage.get_state(&id) {
-            Some(state) if state.sn == want_sn => {
-                println!("  accepted {:30} sn={} {}", case.label, state.sn, id);
+        let (landed, detail) = match storage.get_state(&id) {
+            Some(state) if state.sn == want_sn => (true, format!("sn={} {}", state.sn, id)),
+            Some(state) => (
+                false,
+                format!(
+                    "the log is at sn={} but this event is sn={} — accepted events \
+                     exist, this one is not among them",
+                    state.sn, want_sn
+                ),
+            ),
+            None => (
+                false,
+                err.unwrap_or_else(|| "nothing was established".into()),
+            ),
+        };
+        match (landed, must_refuse) {
+            (true, false) => {
+                println!("  accepted {:30} {}", case.label, detail);
                 accepted += 1;
             }
-            Some(state) => {
-                println!(
-                    "  REFUSED  {:30} the log is at sn={} but this event is sn={} — \
-                     accepted events exist, this one is not among them",
-                    case.label, state.sn, want_sn
-                );
+            (false, true) => {
+                println!("  refused  {:30} as it must be: {}", case.label, detail);
+                accepted += 1;
+            }
+            (true, true) => {
+                println!("  ACCEPTED {:30} must be refused: {}", case.label, detail);
                 refused += 1;
             }
-            None => {
-                let detail = err.unwrap_or_else(|| "nothing was established".into());
+            (false, false) => {
                 println!("  REFUSED  {:30} {}", case.label, detail);
                 refused += 1;
             }

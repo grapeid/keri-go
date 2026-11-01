@@ -114,8 +114,17 @@ func TestTheIndexIsWrittenIntoTheSignature(t *testing.T) {
 			t.Errorf("index %d wrote %q into the code", i, got)
 		}
 	}
-	if _, err := indexedSigQB64(raw, 64); err == nil {
-		t.Error("an index too wide for a single digit was accepted, which would " +
+	// An index too wide for one digit takes the two-digit code, as the
+	// reference writes it, rather than wrapping to a different key.
+	q, err := indexedSigQB64(raw, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(q, "2ABABA") || len(q) != 92 {
+		t.Errorf("index 64 was written as %.6s… (%d characters), want 2ABABA… (92)", q, len(q))
+	}
+	if _, err := indexedSigQB64(raw, 64*64); err == nil {
+		t.Error("an index too wide for two digits was accepted, which would " +
 			"attribute the signature to the wrong key")
 	}
 }

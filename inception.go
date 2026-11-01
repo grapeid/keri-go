@@ -3,8 +3,6 @@ package keri
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -214,9 +212,6 @@ func hexCount(n int) string {
 	return strconv.FormatInt(int64(n), 16)
 }
 
-// weightPattern matches a threshold weight: a whole number, or a fraction.
-var weightPattern = regexp.MustCompile(`^(\d+)(?:/(\d+))?$`)
-
 // renderThreshold normalises a signing threshold into the bytes KERI writes.
 //
 // Two shapes are legitimate and mean different things:
@@ -235,159 +230,26 @@ var weightPattern = regexp.MustCompile(`^(\d+)(?:/(\d+))?$`)
 // threshold fall below 1, because an identity that needs no signatures is not an
 // identity. A next-key threshold over an empty list is legitimately 0.
 func renderThreshold(raw json.RawMessage, count, floor int, field string) (json.RawMessage, error) {
-	trimmed := strings.TrimSpace(string(raw))
-	if trimmed == "" || trimmed == "null" {
-		n := (count + 1) / 2 // ceil(count/2)
-		if n < floor {
-			n = floor
-		}
-		return json.Marshal(hexCount(n))
+	// Read and rendered by the one threshold implementation (threshold.go);
+	// what is added here is only what an inception and a delegated inception
+	// require of it: a stated count within floor..count, and no more weights
+	// than keys.
+	t, err := parseThresholdValue(raw, max(floor, ceilDiv(count, 2)))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", field, err)
 	}
-
-	switch trimmed[0] {
-	case '[':
-		return renderWeightedThreshold(trimmed, count, field)
-	case '"':
-		var s string
-		if err := json.Unmarshal(raw, &s); err != nil {
-			return nil, fmt.Errorf("%s is not readable: %w", field, err)
-		}
-		n, err := strconv.ParseInt(s, 16, 64)
-		if err != nil {
-			return nil, fmt.Errorf("%s is %q, which is neither a hex threshold nor a "+
-				"list of weights", field, s)
-		}
-		if err := checkThresholdFits(int(n), count, floor, field); err != nil {
-			return nil, err
-		}
-		// Re-rendered rather than passed through: the reference normalises, so
-		// "02" and "2" must both come out as "2" or the same threshold would
-		// produce two identities.
-		return json.Marshal(hexCount(int(n)))
-	default:
-		var n int64
-		if err := json.Unmarshal(raw, &n); err != nil {
-			return nil, fmt.Errorf("%s is not a threshold: %w", field, err)
-		}
-		if err := checkThresholdFits(int(n), count, floor, field); err != nil {
-			return nil, err
-		}
-		return json.Marshal(hexCount(int(n)))
-	}
-}
-
-// renderWeightedThreshold validates and re-emits a threshold written as
-// weights.
-//
-// Re-emitted rather than passed through for two reasons, both of which change
-// the bytes and therefore the identity:
-//
-//   - the incoming bytes may carry whitespace, and whitespace inside an event
-//     changes its length;
-//   - the reference reduces every weight to lowest terms and writes a whole
-//     number without a denominator, so "2/4" and "1/2" are the same threshold
-//     but only one of them is the same event, and "1/1" is written "1".
-//
-// Order is preserved throughout, because weight n belongs to key n.
-func renderWeightedThreshold(trimmed string, count int, field string) (json.RawMessage, error) {
-	var entries []json.RawMessage
-	if err := json.Unmarshal([]byte(trimmed), &entries); err != nil {
-		return nil, fmt.Errorf("%s is not a readable list of weights: %w", field, err)
-	}
-	if len(entries) == 0 {
-		return nil, fmt.Errorf("%s is an empty list, which states no threshold at all", field)
-	}
-
-	// A flat list is ONE clause whose weights must together be able to reach 1;
-	// a list of lists is several clauses, each of which must reach 1 on its own.
-	// Treating each weight of a flat list as its own clause would refuse
-	// ["1/2","1/2","1/2"], which is a perfectly ordinary 2-of-3.
-	nested := strings.TrimSpace(string(entries[0]))[0] == '['
-	var clauses [][]string
-	for _, entry := range entries {
-		isGroup := strings.TrimSpace(string(entry))[0] == '['
-		if isGroup != nested {
-			return nil, fmt.Errorf("%s mixes bare weights with groups of weights, which "+
-				"does not say which of them have to be satisfied", field)
-		}
-		if !nested {
-			var weight string
-			if err := json.Unmarshal(entry, &weight); err != nil {
-				return nil, fmt.Errorf("%s holds an entry that is not a weight: %w", field, err)
-			}
-			if len(clauses) == 0 {
-				clauses = append(clauses, nil)
-			}
-			clauses[0] = append(clauses[0], weight)
-			continue
-		}
-		var group []string
-		if err := json.Unmarshal(entry, &group); err != nil {
-			return nil, fmt.Errorf("%s holds a group that is not a list of weights: %w",
-				field, err)
-		}
-		clauses = append(clauses, group)
-	}
-
-	total := 0
-	normalised := make([][]string, 0, len(clauses))
-	for _, clause := range clauses {
-		reduced, err := normaliseWeights(clause, field)
-		if err != nil {
-			return nil, err
-		}
-		total += len(reduced)
-		normalised = append(normalised, reduced)
-	}
-	if total > count {
+	stated := strings.TrimSpace(string(raw))
+	switch {
+	case t.weighted && t.size > count:
 		return nil, fmt.Errorf("%s carries %d weights but there are only %d keys to "+
-			"weigh, so the threshold could never be met", field, total, count)
+			"weigh, so the threshold could never be met", field, t.size, count)
+	case !t.weighted && stated != "" && stated != "null":
+		if err := checkThresholdFits(t.size, count, floor, field); err != nil {
+			return nil, err
+		}
 	}
-	// A single clause is written flat, not as a list holding one list — that is
-	// how the reference writes it, and the two forms are different bytes.
-	if len(normalised) == 1 {
-		return json.Marshal(normalised[0])
-	}
-	return json.Marshal(normalised)
+	return t.value, nil
 }
-
-// normaliseWeights reduces a clause's weights and refuses ones that are
-// malformed or that could never be met.
-//
-// A clause is satisfied when the signers' weights sum to at least 1, so a
-// clause whose weights cannot reach 1 founds an identity that can never sign
-// again — a loss that stays silent until the first attempt to use it.
-func normaliseWeights(weights []string, field string) ([]string, error) {
-	sum := new(big.Rat)
-	out := make([]string, 0, len(weights))
-	for _, w := range weights {
-		m := weightPattern.FindStringSubmatch(w)
-		if m == nil {
-			return nil, fmt.Errorf("%s holds %q, which is not a weight; weights are written "+
-				"as a whole number or a fraction such as \"1/2\"", field, w)
-		}
-		if m[2] != "" && strings.Trim(m[2], "0") == "" {
-			return nil, fmt.Errorf("%s holds the weight %q, which has a denominator of zero",
-				field, w)
-		}
-		r, ok := new(big.Rat).SetString(w)
-		if !ok || r.Sign() < 0 || r.Cmp(oneRat) > 0 {
-			return nil, fmt.Errorf("%s holds the weight %q, which is not between 0 and 1",
-				field, w)
-		}
-		// RatString reduces and drops a denominator of 1, which is exactly how
-		// the reference writes a weight.
-		out = append(out, r.RatString())
-		sum.Add(sum, r)
-	}
-	if len(out) > 0 && sum.Cmp(oneRat) < 0 {
-		return nil, fmt.Errorf("%s holds weights summing to %s, which never reaches 1, so no "+
-			"set of signatures could ever satisfy it", field, sum.RatString())
-	}
-	return out, nil
-}
-
-var oneRat = big.NewRat(1, 1)
 
 func checkThresholdFits(n, count, floor int, field string) error {
 	if n < floor {

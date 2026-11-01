@@ -8,7 +8,9 @@ pre-rotation, witness thresholds, delegation approval — over our output.
 
     go run ./interop | python interop/verify_interop.py
 
-Exit status is non-zero if anything is refused, so this can gate a build.
+Exit status is non-zero if anything is judged other than expected, so this can
+gate a build. A case marked "expect": "refused" must be refused; a case carrying
+keri-go's own verdict ("kerigo") must also be judged the same way by both.
 A case keri-go could not build at all is reported as SKIPPED and does not pass.
 """
 
@@ -180,9 +182,26 @@ def main():
             except Exception as exc:  # noqa: BLE001 — report, never mask
                 ok, detail = False, f"{type(exc).__name__}: {exc}"
 
+            # A case marked "refused" must be refused. keripy holds a rotation
+            # whose signatures fall short in escrow rather than rejecting it,
+            # so "refused" here means it never became the latest event.
+            expect_refused = case.get("expect") == "refused"
+            if ok is not None and case.get("kerigo"):
+                kerigo_ok = case["kerigo"] == "accepted"
+                if kerigo_ok != ok:
+                    print(f"  DISAGREE {label:30} keripy {'accepted' if ok else 'refused'} "
+                          f"({detail}); keri-go {case['kerigo']}")
+                    refused += 1
+                    continue
             if ok is None:
                 print(f"  UNPROVEN {label:30} {detail}")
                 unproven += 1
+            elif expect_refused and not ok:
+                print(f"  refused  {label:30} as it must be, by both: {detail}")
+                accepted += 1
+            elif expect_refused:
+                print(f"  ACCEPTED {label:30} must be refused: {detail}")
+                refused += 1
             elif ok:
                 print(f"  accepted {label:30} {detail}")
                 accepted += 1
@@ -191,7 +210,7 @@ def main():
                 refused += 1
 
     total = len(cases)
-    print(f"\n{accepted} accepted, {refused} refused, {unproven} unproven, "
+    print(f"\n{accepted} judged as expected, {refused} not, {unproven} unproven, "
           f"{skipped} skipped, out of {total}")
     # Unproven does not fail the build: it marks a case this harness cannot yet
     # judge, which is a gap in the test rather than in what is being tested.

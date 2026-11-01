@@ -73,7 +73,12 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 	var (
 		keys      []string
 		threshold *parsedThreshold
-		result    SignedKELResult
+		// priorNext and priorNextTh are the commitment of the last
+		// establishment event: what the next rotation must open. An
+		// interaction carries none, so it never changes them.
+		priorNext   []string
+		priorNextTh *parsedThreshold
+		result      SignedKELResult
 	)
 
 	for i, raw := range events {
@@ -88,10 +93,11 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 			result.Identifier = ev.Identifier
 		}
 
-		// An establishment event sets the state. Its own keys are the right
-		// thing to check it against: ValidateKEL has already confirmed that a
-		// rotation presents keys the previous event committed to by digest, so
-		// they are not self-asserted.
+		// An establishment event sets the state, and its own keys are the
+		// right thing to check its signatures against. What makes them more
+		// than self-asserted, for a rotation, is the check below that the keys
+		// which signed open enough of the previous commitment.
+		rotation := ev.Ilk == "rot" || ev.Ilk == "drt"
 		if ev.Establishment() {
 			keys = ev.Keys
 			threshold = ev.SigThreshold
@@ -103,7 +109,13 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 		}
 
 		fs.at(fmt.Sprintf("event %d (%s at sn %d)", i, ev.Ilk, ev.SN))
-		verifyAgainstKeyState(fs, ev, attachments[i], keys, threshold)
+		verified := verifyAgainstKeyState(fs, ev, attachments[i], keys, threshold)
+		if rotation {
+			checkPriorNextOpened(fs, ev, verified, priorNext, priorNextTh)
+		}
+		if ev.Establishment() {
+			priorNext, priorNextTh = ev.NextDigest, ev.NextThreshold
+		}
 	}
 
 	if err := fs.err(); err != nil {
@@ -115,20 +127,35 @@ func ValidateSignedKEL(messages [][]byte) (*SignedKELResult, error) {
 	return &result, nil
 }
 
-// verifyAgainstKeyState checks an event's controller signatures against a key
-// state supplied from outside the event.
-func verifyAgainstKeyState(fs *faults, ev *Event, groups []attachment,
-	keys []string, threshold *parsedThreshold) {
+// verifyControllerSignatures checks an event's controller signatures against a
+// key list. It returns the ones that verified, each at most once, and how many
+// were dropped because they did not verify.
+//
+// The key list is the event's own for an establishment event and the key state
+// in force for an interaction; the caller decides which.
+//
+// A signature that does not verify is dropped and the rest are judged, as
+// keripy 1.3.6 does: it attests nothing, and it never counts toward any
+// threshold. Refusing the whole event over it would let anyone who passes the
+// event along make a valid event unverifiable by appending junk. A signature
+// naming a place outside the key list is still a fault, as it is in keripy,
+// and so is a key that cannot be read.
+func verifyControllerSignatures(fs *faults, ev *Event, groups []attachment,
+	keys []string) (verified []indexedSig, dropped int) {
 
-	signed := make(map[int]bool)
+	seen := make(map[string]bool)
 	for _, g := range groups {
 		if g.Counter != counterControllerIdxSigs {
 			continue
 		}
 		for _, sig := range g.Sigs {
+			if seen[sig.QB64] {
+				continue // the same signature twice is one signature
+			}
+			seen[sig.QB64] = true
 			if sig.Index < 0 || sig.Index >= len(keys) {
 				fs.add(FaultSignatureInvalid, "a signature claims key %d and the key "+
-					"state holds %d keys", sig.Index, len(keys))
+					"list holds %d keys", sig.Index, len(keys))
 				continue
 			}
 			pub, err := MatterRaw(CodeEd25519, keys[sig.Index], ed25519.PublicKeySize)
@@ -141,23 +168,82 @@ func verifyAgainstKeyState(fs *faults, ev *Event, groups []attachment,
 				continue
 			}
 			if !ed25519.Verify(pub, ev.Raw, sig.Raw) {
-				fs.add(FaultSignatureInvalid, "the signature attached for key %d (%s) "+
-					"does not verify over this event, so whoever produced it did not "+
-					"hold that key", sig.Index, keys[sig.Index])
+				dropped++
 				continue
 			}
-			signed[sig.Index] = true
+			verified = append(verified, sig)
 		}
 	}
+	return verified, dropped
+}
 
+// verifyAgainstKeyState checks an event's controller signatures against a key
+// state and its signing threshold, and returns the signatures that verified.
+func verifyAgainstKeyState(fs *faults, ev *Event, groups []attachment,
+	keys []string, threshold *parsedThreshold) []indexedSig {
+
+	verified, dropped := verifyControllerSignatures(fs, ev, groups, keys)
+	signed := make(map[int]bool, len(verified))
+	for _, sig := range verified {
+		signed[sig.Index] = true
+	}
+	// Said in the refusal, so a reader can tell a forgery from a short count.
+	unverified := ""
+	if dropped > 0 {
+		unverified = fmt.Sprintf("; %d attached signature(s) did not verify over this "+
+			"event and were not counted", dropped)
+	}
 	if len(signed) == 0 {
 		fs.add(FaultThresholdNotMet, "the event arrives with no controller signature "+
-			"that verifies under the identity's established keys, so nothing attests "+
-			"that its controller produced it")
-		return
+			"that verifies under the keys it must be signed by, so nothing attests "+
+			"that its controller produced it%s", unverified)
+		return verified
 	}
-	if threshold != nil && !threshold.satisfiedBy(signed, len(keys)) {
-		fs.add(FaultThresholdNotMet, "%d of %d established keys signed, which does not "+
-			"meet the threshold in force", len(signed), len(keys))
+	if threshold != nil && !threshold.satisfiedBy(signed) {
+		fs.add(FaultThresholdNotMet, "%d of %d keys signed, which does not meet the "+
+			"signing threshold in force%s", len(signed), len(keys), unverified)
+	}
+	return verified
+}
+
+// checkPriorNextOpened is the rule that makes a rotation safe, with the
+// signatures in hand.
+//
+// The previous establishment event published DIGESTS of the keys that would
+// come next, and a threshold over them. A rotation is authorised by the prior
+// commitments its signing keys open: a signature that carries a prior-next
+// place (every code but the current-only ones) opens that place when the key it
+// was made with digests to the commitment there. The places opened must meet
+// the prior next threshold. A key that is merely listed in k, without signing,
+// opens nothing — counting listed keys is how a rotation signed by too few of
+// the committed keys would pass.
+//
+// Each opened place counts once, which is stricter than keripy 1.3.6: it
+// counts a place once per signature opening it, so one key written twice can
+// meet a prior next threshold of two alone (see satisfiedBy).
+//
+// Otherwise this is keripy's Kever.exposeds and its prior-next check: a signature
+// whose prior-next place is outside the commitment, or whose key does not
+// digest to the commitment there, simply opens nothing. It is not a fault on
+// its own, because the same signature may still count toward the new kt.
+func checkPriorNextOpened(fs *faults, ev *Event, verified []indexedSig,
+	committed []string, th *parsedThreshold) {
+
+	opened := make(map[int]bool)
+	for _, sig := range verified {
+		if !sig.HasOndex || sig.Ondex < 0 || sig.Ondex >= len(committed) {
+			continue
+		}
+		digest, err := Blake3SAID([]byte(ev.Keys[sig.Index]))
+		if err != nil || digest != committed[sig.Ondex] {
+			continue
+		}
+		opened[sig.Ondex] = true
+	}
+	if !th.satisfiedBy(opened) {
+		fs.add(FaultThresholdNotMet, "the keys that signed open %d of the %d keys the "+
+			"previous establishment event committed to, which does not meet the next "+
+			"threshold it set, so this rotation was not authorised by the committed keys",
+			len(opened), len(committed))
 	}
 }

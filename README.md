@@ -69,13 +69,14 @@ that gap.
 | | |
 |---|---|
 | Key events | inception, rotation, interaction, delegated inception and rotation |
-| Thresholds | integer and fractional-weight, for both current and next keys |
+| Thresholds | integer and fractional-weight, including nested weighted sets, for both current and next keys; `SatisfiesThreshold` answers whether signatures at given places meet one |
 | Witnesses | witness lists, thresholds, receipts, receipt streams |
 | Validation | key-log validation, signature verification against established key state, delegation authority |
 | Duplicity | detection of two conflicting events at one sequence number |
 | Credentials | ACDC credentials, registries, issuance, revocation, **edge-chain verification** |
 | Keys | generation, pre-rotation custody, encrypted-at-rest storage, an interface a hardware signer can satisfy |
 | Streams | CESR attachments, and publishing or reading a whole key log |
+| Signatures | indexed Ed25519 in all four forms keripy defines: `A` and `2A` (a place in the key list and a place in the prior next-key commitments, the same or apart), `B` and `2B` (the key list only) |
 
 Both CESR 1.0 and 2.0 can be read and built. **1.0 is the default**, because 2.0
 is not frozen: two builds of the reference produce different 2.0 bytes, and a
@@ -119,11 +120,30 @@ go run ./interop | .venv/bin/python3 interop/verify_interop.py
 
 # keriox — independent Rust — judges the same
 go run ./interop | cargo run --manifest-path interop-keriox/Cargo.toml
+
+# the reverse: keripy builds, keri-go must reach keripy's verdict
+.venv/bin/python3 interop/keripy_builds.py | go run ./interop/judge
 ```
 
-keriox accepts all fifteen cases, including witness receipts, delegation, a
-credential registry, issuance and revocation, and a whole key log published as a
-single stream. That matters more than the keripy result, because keripy
+The rotation cases are the ones whose authority turns on which keys signed: a
+partial rotation with a dual-index signature, an augmented rotation, nested
+weighted thresholds for two and three owners, and the cases that must be
+refused (too few committed keys signing, a wrong prior-next place, an added
+key alone). Each carries keri-go's own verdict, and the keripy judge fails the
+run if the two disagree. Both directions exit non-zero on any disagreement.
+
+One difference is deliberate and tested as such: keripy counts a key once per
+verified signature and removes only byte-identical ones, so one key signing at
+one place in two spellings (A and B, or A and 2A) counts twice and can meet a
+two-key signing or prior-next threshold alone. keri-go counts each place once
+and refuses those logs.
+
+keriox judges 35 of the 45 cases as expected, including witness receipts,
+delegation, a credential registry, issuance and revocation, a whole key log
+published as a single stream, dual-index signatures and augmented rotations.
+The other ten are not put to it: eight carry nested weighted thresholds, which
+keriox does not read, and two carry a signature that does not verify, which
+keriox refuses outright where keripy and keri-go drop it and judge the rest. That matters more than the keripy result, because keripy
 generated the vectors this was built against and keriox had no part in
 producing anything here.
 

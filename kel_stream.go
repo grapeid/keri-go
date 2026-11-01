@@ -128,7 +128,7 @@ func attachmentWidth(s []byte) (int, error) {
 			return 0, fmt.Errorf("the attachment counter %q is not readable: %w",
 				remaining[:4], err)
 		}
-		body, err := groupBodyWidth(code, count)
+		body, err := groupBodyWidth(code, count, string(remaining[4:]))
 		if err != nil {
 			return 0, err
 		}
@@ -146,16 +146,21 @@ func attachmentWidth(s []byte) (int, error) {
 // Stated as a table rather than derived, so that adding a group is a visible
 // change somebody reviews. A width that is wrong here does not fail loudly — it
 // silently reads the next message from the wrong offset.
-func groupBodyWidth(code string, count int) (int, error) {
+//
+// Indexed signatures, alone or inside a transferable receipt quadruple, are
+// measured one by one, because each one's width depends on its own code (88
+// characters for A and B, 92 for 2A and 2B).
+func groupBodyWidth(code string, count int, body string) (int, error) {
 	switch code {
 	case counterControllerIdxSigs, counterWitnessIdxSigs:
-		return count * sizeIndexedSig, nil
+		_, used, err := readIndexedSigs(code, body, count)
+		return used, err
 	case counterNonTransReceiptCouples:
 		return count * (sizePrefix + sizeCigar), nil
 	case CounterSealSourceCouples:
 		return count * (sizeSeqner + saidPlaceholderLen), nil
 	case counterTransReceiptQuadruples:
-		return count * (sizePrefix + sizeSeqner + saidPlaceholderLen + sizeCigar), nil
+		return transReceiptQuadruplesWidth(code, body, count)
 	case counterAttachedMaterial:
 		// The count is in quadlets of four characters, and the body is another
 		// sequence of groups — already measured by the count.

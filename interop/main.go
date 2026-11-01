@@ -35,6 +35,14 @@ type kase struct {
 	Extra   []string `json:"extra_b64,omitempty"`
 	Issuer  string   `json:"issuer,omitempty"`
 	Skipped string   `json:"skipped,omitempty"`
+	// Expect is "refused" for a case both implementations must refuse; empty
+	// means it must be accepted.
+	Expect string `json:"expect,omitempty"`
+	// KeriGo is this package's own verdict on the same log, "accepted" or
+	// "refused: why", so the judge can check the two implementations agree.
+	KeriGo string `json:"kerigo,omitempty"`
+	// KerioxSkip says why keriox is not asked to judge this case.
+	KerioxSkip string `json:"keriox_skip,omitempty"`
 }
 
 var cases []kase
@@ -333,6 +341,10 @@ func main() {
 	// ---- credentials and their transaction events -------------------------
 
 	emitCredentials(signerFor('t', true), signerFor('u', true))
+
+	// ---- rotations whose authority turns on which keys signed --------------
+
+	emitRotationShapes()
 
 	if err := json.NewEncoder(os.Stdout).Encode(cases); err != nil {
 		must(err)
