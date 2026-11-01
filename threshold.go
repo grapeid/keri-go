@@ -282,9 +282,14 @@ func (t *parsedThreshold) exceeds(n int) (bool, string) {
 }
 
 // satisfiedBy reports whether signatures by the keys at these positions meet
-// this threshold, exactly as keripy 1.3.6's Tholder.satisfy decides it.
+// this threshold, as keripy 1.3.6's Tholder.satisfy decides it, with one
+// deliberate difference.
 //
-// Each position counts once however many signatures name it. A count is met by
+// Each position counts once however many signatures name it. keripy counts a
+// numeric threshold by the number of verified signatures, and removes only
+// signatures that are byte-identical, so one key signing at one place in two
+// spellings (A and B, or A and 2A) counts twice there: one key can meet a
+// 2-of-2 signing or prior-next threshold alone. This refuses that. A count is met by
 // that many distinct positions. A weighted threshold is met when every clause
 // is; a position beyond the keys it weighs meets nothing, and makes the whole
 // answer no, as it does in the reference.

@@ -132,6 +132,12 @@ refused (too few committed keys signing, a wrong prior-next place, an added
 key alone). Each carries keri-go's own verdict, and the keripy judge fails the
 run if the two disagree. Both directions exit non-zero on any disagreement.
 
+One difference is deliberate and tested as such: keripy counts a key once per
+verified signature and removes only byte-identical ones, so one key signing at
+one place in two spellings (A and B, or A and 2A) counts twice and can meet a
+two-key signing or prior-next threshold alone. keri-go counts each place once
+and refuses those logs.
+
 keriox judges 33 of the 41 cases as expected, including witness receipts,
 delegation, a credential registry, issuance and revocation, a whole key log
 published as a single stream, dual-index signatures and augmented rotations.

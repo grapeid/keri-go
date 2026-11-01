@@ -210,7 +210,11 @@ func verifyAgainstKeyState(fs *faults, ev *Event, groups []attachment,
 // opens nothing — counting listed keys is how a rotation signed by too few of
 // the committed keys would pass.
 //
-// This is keripy 1.3.6's Kever.exposeds and its prior-next check: a signature
+// Each opened place counts once, which is stricter than keripy 1.3.6: it
+// counts a place once per signature opening it, so one key written twice can
+// meet a prior next threshold of two alone (see satisfiedBy).
+//
+// Otherwise this is keripy's Kever.exposeds and its prior-next check: a signature
 // whose prior-next place is outside the commitment, or whose key does not
 // digest to the commitment there, simply opens nothing. It is not a fault on
 // its own, because the same signature may still count toward the new kt.

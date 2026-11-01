@@ -25,6 +25,9 @@ type kase struct {
 	Codes    []string `json:"codes"`
 	Messages []string `json:"messages_b64"`
 	Keripy   string   `json:"keripy"`
+	// Divergence, when set, says why keri-go deliberately refuses a log
+	// keripy accepts. For such a case, agreement is exactly that.
+	Divergence string `json:"divergence"`
 }
 
 func main() {
@@ -55,6 +58,19 @@ func main() {
 		keripyAccepted := c.Keripy == "accepted"
 		kerigoAccepted := verdict == "accepted"
 		codes := strings.Join(c.Codes, ",")
+		if c.Divergence != "" {
+			if keripyAccepted && !kerigoAccepted {
+				agree++
+				fmt.Printf("  DIVERGES as meant %-25s [%s] keripy accepts, keri-go refuses: %s\n",
+					c.Label, codes, c.Divergence)
+			} else {
+				disagree++
+				fmt.Printf("  UNEXPECTED       %-26s [%s] keripy %s; keri-go %s; expected keripy "+
+					"to accept and keri-go to refuse (%s)\n", c.Label, codes, c.Keripy, verdict,
+					c.Divergence)
+			}
+			continue
+		}
 		if keripyAccepted == kerigoAccepted {
 			agree++
 			word := "accepted"
@@ -68,7 +84,7 @@ func main() {
 		fmt.Printf("  DISAGREE         %-26s [%s] keripy %s; keri-go %s\n",
 			c.Label, codes, c.Keripy, verdict)
 	}
-	fmt.Printf("\n%d agree, %d disagree, out of %d built by keripy\n", agree, disagree, len(cases))
+	fmt.Printf("\n%d as expected, %d not, out of %d built by keripy\n", agree, disagree, len(cases))
 	if disagree > 0 {
 		os.Exit(1)
 	}

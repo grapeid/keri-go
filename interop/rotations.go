@@ -115,24 +115,24 @@ func emitRotationShapes() {
 
 	// ---- one owner: partial rotation with a dual-index signature ----------
 	{
-		owner, reserve, classical, after := fresh(), fresh(), fresh(), fresh()
-		// Commit [reserve, classical], nt = 1. The rotation reveals the second
+		owner, other, revealed, after := fresh(), fresh(), fresh(), fresh()
+		// Commit [other, revealed], nt = 1. The rotation reveals the second
 		// commitment alone, at k[0]: index 0, prior place 1, code 2A.
 		id := found("partial-dual-index", []keri.Signer{owner}, `"1"`,
-			digests(reserve, classical), `"1"`)
+			digests(other, revealed), `"1"`)
 		rotate(id, "partial-dual-index",
 			"a partial rotation revealing n[1] at k[0], signed with index 0 and prior place 1",
-			accepted, pubs([]keri.Signer{classical}), `"1"`, digests(after), `"1"`,
-			at(classical, 0, 1))
+			accepted, pubs([]keri.Signer{revealed}), `"1"`, digests(after), `"1"`,
+			at(revealed, 0, 1))
 	}
 	{
-		owner, reserve, classical, after := fresh(), fresh(), fresh(), fresh()
+		owner, other, revealed, after := fresh(), fresh(), fresh(), fresh()
 		id := found("wrong-prior-place", []keri.Signer{owner}, `"1"`,
-			digests(reserve, classical), `"1"`)
+			digests(other, revealed), `"1"`)
 		rotate(id, "wrong-prior-place",
 			"the same reveal signed with prior place 0, which this key does not open",
-			refused, pubs([]keri.Signer{classical}), `"1"`, digests(after), `"1"`,
-			at(classical, 0, 0))
+			refused, pubs([]keri.Signer{revealed}), `"1"`, digests(after), `"1"`,
+			at(revealed, 0, 0))
 	}
 	{
 		owner, c, d, after := fresh(), fresh(), fresh(), fresh()
@@ -165,8 +165,8 @@ func emitRotationShapes() {
 	}
 
 	// ---- two owners, both must act ----------------------------------------
-	// Owner i holds k[i] and commits n[2i] (next classical) and n[2i+1]
-	// (reserve). One clause per owner, each met by either of that owner's keys.
+	// Owner i holds k[i] and commits n[2i] (first) and n[2i+1]
+	// (second). One clause per owner, each met by either of that owner's keys.
 	const twoStageOne = `[["1","1"],["1","1"]]`
 	const twoStageTwo = `[["1/2","1/2"],["1/2","1/2"]]`
 	twoOwners := func(label string) (identity, [4]keri.Signer) {
@@ -178,7 +178,7 @@ func emitRotationShapes() {
 		id, n := twoOwners("two-owners")
 		after := [4]keri.Signer{fresh(), fresh(), fresh(), fresh()}
 		rotate(id, "two-owners",
-			"both owners reveal their next classical key; owner 1 sits at k[1] and opens n[2]",
+			"both owners reveal their first key; owner 1 sits at k[1] and opens n[2]",
 			accepted, pubs([]keri.Signer{n[0], n[2]}), `"2"`, digests(after[:]...), twoStageOne,
 			at(n[0], 0, 0), at(n[2], 1, 2))
 	}
@@ -226,14 +226,14 @@ func emitRotationShapes() {
 	{
 		id, n := threeOwners("three-owners")
 		rotate(id, "three-owners",
-			"owners 0 and 2 reveal their classical keys; owner 2 sits at k[1] and opens n[4]",
+			"owners 0 and 2 reveal their first keys; owner 2 sits at k[1] and opens n[4]",
 			accepted, pubs([]keri.Signer{n[0], n[4]}), `"2"`, afterSix(), threeStageOne,
 			at(n[0], 0, 0), at(n[4], 1, 4))
 	}
 	{
-		id, n := threeOwners("three-owners-reserve")
-		rotate(id, "three-owners-reserve",
-			"owner 0's classical key with owner 2's reserve key, opening n[0] and n[5]",
+		id, n := threeOwners("three-owners-second-key")
+		rotate(id, "three-owners-second-key",
+			"owner 0's first key with owner 2's second key, opening n[0] and n[5]",
 			accepted, pubs([]keri.Signer{n[0], n[5]}), `"2"`, afterSix(), threeStageOne,
 			at(n[0], 0, 0), at(n[5], 1, 5))
 	}

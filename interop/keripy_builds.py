@@ -18,7 +18,7 @@ import base64
 import json
 import sys
 
-from keri.core import coring, eventing, parsing, serdering, signing
+from keri.core import coring, eventing, indexing, parsing, serdering, signing
 from keri.core.coring import MtrDex
 from keri.db import basing
 
@@ -59,10 +59,18 @@ def keripy_verdict(messages, final_said):
 cases = []
 
 
+def sign_as(ser, signer, index, ondex, only, code=None):
+    """keripy's signer, which picks the code; or, given a code, a signature
+    written in that code at those places, as a peer could write it."""
+    if code is None:
+        return signer.sign(ser, index=index, ondex=ondex, only=only)
+    return indexing.Siger(raw=signer.sign(ser).raw, code=code, index=index, ondex=ondex)
+
+
 def case(label, why, expect, icp_keys, isith, ndigs, nsith, rot_keys, rsith,
-         rndigs, rnsith, sigs):
+         rndigs, rnsith, sigs, divergence=""):
     """Incept on icp_keys, then rotate to rot_keys signed as sigs describes:
-    a list of (signer, index, ondex, only), passed to keripy's signer as is."""
+    a list of (signer, index, ondex, only[, code]) for sign_as."""
     icp = eventing.incept(keys=[s.verfer.qb64 for s in icp_keys], isith=isith,
                           ndigs=ndigs, nsith=nsith, code=MtrDex.Blake3_256)
     icp_sigs = [s.sign(icp.raw, index=i) for i, s in enumerate(icp_keys)]
@@ -71,8 +79,7 @@ def case(label, why, expect, icp_keys, isith, ndigs, nsith, rot_keys, rsith,
     rot = eventing.rotate(pre=icp.pre, keys=[s.verfer.qb64 for s in rot_keys],
                           dig=icp.said, sn=1, isith=rsith, ndigs=rndigs,
                           nsith=rnsith)
-    rot_sigs = [s.sign(rot.raw, index=i, ondex=o, only=only)
-                for (s, i, o, only) in sigs]
+    rot_sigs = [sign_as(rot.raw, *sig) for sig in sigs]
     rot_msg = eventing.messagize(rot, sigers=rot_sigs)
 
     messages = [bytes(icp_msg), bytes(rot_msg)]
@@ -83,6 +90,7 @@ def case(label, why, expect, icp_keys, isith, ndigs, nsith, rot_keys, rsith,
         "codes": [sg.code for sg in rot_sigs],
         "messages_b64": [base64.b64encode(m).decode() for m in messages],
         "keripy": keripy_verdict(messages, rot.said),
+        "divergence": divergence,
     })
 
 
@@ -106,14 +114,14 @@ def main():
     accepted, refused = "accepted", "refused"
 
     # One owner, two commitments, nt = 1: reveal the second alone at k[0].
-    o, reserve, c, after = fresh(), fresh(), fresh(), fresh()
+    o, other, c, after = fresh(), fresh(), fresh(), fresh()
     case("partial-dual-index", "reveal n[1] at k[0]; keripy writes 2A", accepted,
-         [o], "1", [dig(reserve), dig(c)], "1",
+         [o], "1", [dig(other), dig(c)], "1",
          [c], "1", [dig(after)], "1", [(c, 0, 1, False)])
 
-    o, reserve, c, after = fresh(), fresh(), fresh(), fresh()
+    o, other, c, after = fresh(), fresh(), fresh(), fresh()
     case("wrong-prior-place", "the same reveal signed as if it opened n[0]", refused,
-         [o], "1", [dig(reserve), dig(c)], "1",
+         [o], "1", [dig(other), dig(c)], "1",
          [c], "1", [dig(after)], "1", [(c, 0, 0, False)])
 
     o, c, d, after = fresh(), fresh(), fresh(), fresh()
@@ -140,7 +148,7 @@ def main():
          [o], "1", [dig(c)], "1",
          [c, added], "1", [dig(after)], "1", [(added, 1, None, False)])
 
-    # Two owners, both must act. Owner i: k[i]; n[2i] classical, n[2i+1] reserve.
+    # Two owners, both must act. Owner i: k[i]; n[2i] first, n[2i+1] second.
     two1 = [["1", "1"], ["1", "1"]]
     two2 = [["1/2", "1/2"], ["1/2", "1/2"]]
     owners, n = [fresh(), fresh()], [fresh() for _ in range(4)]
@@ -176,9 +184,9 @@ def main():
              keys, rsith, [dig(s) for s in after], rnsith_now,
              [(n[p], i, o, False) for (p, i, o) in sig_places])
 
-    three("three-owners", "owners 0 and 2, classical keys; owner 2 opens n[4] at k[1]",
+    three("three-owners", "owners 0 and 2, first keys; owner 2 opens n[4] at k[1]",
           accepted, [0, 4], "2", three1, [(0, 0, 0), (4, 1, 4)])
-    three("three-owners-reserve", "owner 0 classical with owner 2's reserve, n[5]",
+    three("three-owners-second-key", "owner 0's first key with owner 2's second, n[5]",
           accepted, [0, 5], "2", three1, [(0, 0, 0), (5, 1, 5)])
     three("three-owners-one-acts", "owner 0's two keys alone", refused,
           [0, 1], "2", three1, [(0, 0, 0), (1, 1, 1)])
@@ -198,6 +206,23 @@ def main():
     a, e = fresh(), fresh()
     icp_case("next-threshold-zero", "nt 0 over one commitment: abandoned at founding",
              accepted, [a], "1", [dig(e)], "0")
+
+    # Where keri-go deliberately differs. keripy counts a place once per
+    # verified signature and removes only byte-identical signatures, so one key
+    # signing at one place in two spellings counts twice: it meets kt = 2, or a
+    # prior nt = 2, alone. keripy accepts these; keri-go must refuse them.
+    same_key_twice = ("one key written in two spellings counts once in keri-go; "
+                      "keripy counts it twice")
+    o, c, d, e = fresh(), fresh(), fresh(), fresh()
+    case("one-key-meets-kt-twice", "kt = 2 over [c, d]; only c signs, as A and B",
+         accepted, [o], "1", [dig(c)], "1",
+         [c, d], "2", [dig(e)], "1", [(c, 0, None, False), (c, 0, None, True)],
+         divergence=same_key_twice)
+    o, c, d, e = fresh(), fresh(), fresh(), fresh()
+    case("one-key-opens-twice", "prior nt = 2 over [c, d]; only c signs, as A and 2A(0,0)",
+         accepted, [o], "1", [dig(c), dig(d)], "2",
+         [c, d], "1", [dig(e)], "1", [(c, 0, None, False), (c, 0, 0, False, "2A")],
+         divergence=same_key_twice)
 
     # Every case must be judged by keripy as the case says, or the shape
     # tested is not the shape described.
