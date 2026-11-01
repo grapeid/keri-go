@@ -218,3 +218,41 @@ func mustBody(t *testing.T, message []byte) []byte {
 	}
 	return raw
 }
+
+// A watcher records a rotation as evidence only when the keys that signed it
+// open enough of the prior commitment, as ValidateSignedKEL requires. Otherwise
+// anyone could manufacture a "conflicting" rotation signed by keys of their own,
+// or by one of several committed keys.
+func TestAWatcherChecksARotationsPriorCommitment(t *testing.T) {
+	a, c, d, e := newRotKey(t, 'a'), newRotKey(t, 'c'), newRotKey(t, 'd'), newRotKey(t, 'e')
+	icp, icpEv := foundedOn(t, []rotKey{a}, `"1"`, digestsOf(c, d), `"2"`)
+	rot := rotationOf(t, icpEv, 1, pubsOf(c, d), `"1"`, digestsOf(e), `"1"`)
+	oneSigner := handMessage(t, rot, placedSig{key: c, code: "A", index: 0})
+	bothSign := handMessage(t, rot, placedSig{key: c, code: "A", index: 0},
+		placedSig{key: d, code: "A", index: 1})
+
+	// Seen without its inception, the prior commitment is unknown.
+	w := NewSignatureCheckingWatcher()
+	if _, err := w.Observe(bothSign); err == nil {
+		t.Fatal("a rotation was recorded without the commitment it must open")
+	}
+	if _, err := w.Observe(icp); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Observe(oneSigner); err == nil {
+		t.Fatal("a rotation opening one of two commitments under nt 2 was recorded as evidence")
+	}
+	if _, err := w.Observe(bothSign); err != nil {
+		t.Fatalf("a rotation opening both commitments was refused: %v", err)
+	}
+
+	// A second rotation at the same place, by a key nobody committed to, is
+	// not evidence of duplicity: it is checked against the inception's
+	// commitment, not the first rotation's.
+	z := newRotKey(t, 'z')
+	forged := handMessage(t, rotationOf(t, icpEv, 1, pubsOf(z), `"1"`, digestsOf(e), `"1"`),
+		placedSig{key: z, code: "A", index: 0})
+	if dup, err := w.Observe(forged); err == nil || dup != nil {
+		t.Fatalf("a rotation to an uncommitted key was recorded (duplicity %v, error %v)", dup, err)
+	}
+}

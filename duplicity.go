@@ -64,6 +64,19 @@ type Watcher struct {
 	// delegations and credential issuances.
 	keys      map[string][]string
 	threshold map[string]*parsedThreshold
+	// commitments is, per identity, the next-key commitment each first-seen
+	// establishment event made, in sequence order. A rotation must open
+	// enough of the one before it; without this a watcher would record as
+	// evidence a rotation signed by keys nobody committed to.
+	commitments map[string][]commitment
+}
+
+// commitment is what an establishment event at sn commits the next rotation
+// to.
+type commitment struct {
+	sn     uint64
+	next   []string
+	nextTh *parsedThreshold
 }
 
 // NewWatcher returns a watcher that accepts only events whose signatures it can
@@ -85,10 +98,11 @@ func NewWatcher(verifySigned func(message []byte) error) *Watcher {
 		}
 	}
 	return &Watcher{
-		seen:      map[string]map[uint64][]byte{},
-		keys:      map[string][]string{},
-		threshold: map[string]*parsedThreshold{},
-		verify:    verifySigned,
+		seen:        map[string]map[uint64][]byte{},
+		keys:        map[string][]string{},
+		threshold:   map[string]*parsedThreshold{},
+		commitments: map[string][]commitment{},
+		verify:      verifySigned,
 	}
 }
 
@@ -124,8 +138,11 @@ func (w *Watcher) verifyAgainstEstablishedKeys(message []byte) error {
 	if err != nil {
 		return err
 	}
+	if ev.Ilk == "rot" || ev.Ilk == "drt" {
+		return w.verifyRotation(ev, message)
+	}
 	if ev.Establishment() {
-		// The event declares its own keys and ValidateStream checks them.
+		// An inception declares its own keys and ValidateStream checks them.
 		return ValidateStream(message)
 	}
 
@@ -145,6 +162,51 @@ func (w *Watcher) verifyAgainstEstablishedKeys(message []byte) error {
 	}
 	fs := &faults{}
 	verifyAgainstKeyState(fs, ev, groups, keys, threshold)
+	return fs.err()
+}
+
+// verifyRotation checks a rotation's own signatures against its keys and kt,
+// and that the keys which signed open enough of the commitment made by the
+// last establishment event this watcher saw before it: the same rule
+// ValidateSignedKEL applies. A rotation whose prior commitment the watcher
+// has not seen is refused, as an interaction with no known keys is: anyone can
+// sign a rotation to keys of their own, and only the prior commitment says
+// whether those keys had the authority.
+func (w *Watcher) verifyRotation(ev *Event, message []byte) error {
+	if err := ValidateStream(message); err != nil {
+		return err
+	}
+	w.mu.Lock()
+	var prior *commitment
+	for i, c := range w.commitments[ev.Identifier] {
+		if c.sn < ev.SN {
+			prior = &w.commitments[ev.Identifier][i]
+		}
+	}
+	var next []string
+	var nextTh *parsedThreshold
+	if prior != nil {
+		next, nextTh = prior.next, prior.nextTh
+	}
+	w.mu.Unlock()
+
+	if prior == nil {
+		return fmt.Errorf("this watcher has seen no establishment event of %s before sn %d, "+
+			"so whether the keys that signed this rotation were committed to cannot be "+
+			"checked; refusing to record it as evidence", ev.Identifier, ev.SN)
+	}
+	_, attached, err := splitStream(message)
+	if err != nil {
+		return err
+	}
+	groups, err := parseAttachments(attached)
+	if err != nil {
+		return err
+	}
+	fs := &faults{}
+	fs.at(fmt.Sprintf("%s at sn %d", ev.Ilk, ev.SN))
+	verified := verifyAgainstKeyState(fs, ev, groups, ev.Keys, ev.SigThreshold)
+	checkPriorNextOpened(fs, ev, verified, next, nextTh)
 	return fs.err()
 }
 
@@ -268,4 +330,10 @@ func (w *Watcher) recordKeyState(ev *Event) {
 	}
 	w.keys[ev.Identifier] = ev.Keys
 	w.threshold[ev.Identifier] = ev.SigThreshold
+	// Kept in sequence order, so the commitment before a rotation is the last
+	// one with a lower sequence number.
+	list := append(w.commitments[ev.Identifier], commitment{
+		sn: ev.SN, next: ev.NextDigest, nextTh: ev.NextThreshold})
+	sort.SliceStable(list, func(i, j int) bool { return list[i].sn < list[j].sn })
+	w.commitments[ev.Identifier] = list
 }
