@@ -1,10 +1,11 @@
-//go:build !pqtest
+//go:build !kerigo_pqtest
 
 package keri
 
 import (
 	"crypto/rand"
 	"encoding/json"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -67,13 +68,57 @@ func TestAnUnknownOrShortSignatureIsRefused(t *testing.T) {
 		"an unknown code":          "3Z" + big[2:],
 		"a 2A signature too short": big[:len(big)-1],
 	} {
-		group, err := AttachControllerSigs([]string{sig})
+		// Framed by hand: AttachControllerSigs would refuse it before the
+		// verifier saw it.
+		frame, err := counterFrame(CounterControllerIdxSigs, 1)
 		if err != nil {
-			continue // refused before it could be attached
+			t.Fatal(err)
 		}
-		if _, err := ValidateSignedKEL([][]byte{append(append([]byte(nil), icp...), group...)}); err == nil {
-			t.Fatalf("%s was accepted", name)
+		msg := append(append([]byte(nil), icp...), []byte(frame+sig)...)
+		if _, err := ValidateSignedKEL([][]byte{msg}); err == nil {
+			t.Fatalf("%s was accepted by the verifier", name)
 		}
+	}
+}
+
+// A founding listing an ECDSA key keripy reads, beside the Ed25519 key that
+// signs it at a threshold of one, is accepted as keripy accepts it; the ECDSA
+// key's own signature is never counted here (extra_codes.go).
+func TestAKeyKeripyReadsIsReadThoughItsSignatureIsNotCounted(t *testing.T) {
+	s, _ := GenerateSigner(true)
+	n, _ := GenerateSigner(true)
+	edKey, _ := s.PublicKey()
+	edNext, _ := n.PublicKey()
+	d1, _ := NextDigest(edNext)
+	point := make([]byte, 33)
+	point[0] = 2
+	_, _ = rand.Read(point[1:])
+	secp, err := MatterQB64Sized("1AAJ", point)
+	if err != nil {
+		t.Fatal(err)
+	}
+	icp, err := BuildInception(InceptionInput{Keys: []string{edKey, secp}, NextDigests: []string{d1},
+		Isith: json.RawMessage(`"1"`), Nsith: json.RawMessage(`"1"`), Derivation: "self-addressing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ValidateSignedKEL([][]byte{signed(t, icp, s)}); err != nil {
+		t.Fatalf("a founding keripy accepts was refused: %v", err)
+	}
+	if PostQuantumTestCodes() {
+		t.Fatal("a production build reads post-quantum test codes")
+	}
+}
+
+// The file registering the post-quantum codes is not in a build without the
+// tag, so no production binary can contain it.
+func TestThePostQuantumTableIsNotInAProductionBuild(t *testing.T) {
+	out, err := exec.Command("go", "list", "-f", "{{.GoFiles}}", ".").Output()
+	if err != nil {
+		t.Skipf("go list unavailable: %v", err)
+	}
+	if strings.Contains(string(out), "pq_test_codes.go") {
+		t.Fatalf("a build without the tag compiles the post-quantum codes: %s", out)
 	}
 }
 

@@ -5,6 +5,9 @@ import "testing"
 // The embedded suite must agree with the file-based one. If it does not, the
 // thing that runs on a phone is not the thing that was verified on a desktop.
 func TestSelfTestMatchesTheTestSuite(t *testing.T) {
+	if PostQuantumTestCodes() {
+		t.Skip("a test build's selftest fails by design (TestATestBuildSaysSo)")
+	}
 	r := SelfTest()
 	if r.Total == 0 {
 		t.Fatal("the embedded vectors produced no cases")

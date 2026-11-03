@@ -154,17 +154,24 @@ func Blake3SAID(data []byte) (string, error) {
 	return MatterQB64(CodeBlake3_256, sum[:])
 }
 
-// MatterQB64Sized encodes raw under code as CESR's fixed-size table does for a
-// code of any length: the raw bytes are left-padded with zero bytes to a
-// multiple of three, and the code replaces as many leading characters of their
-// base64 as its length past a multiple of four. For a four-character code and
-// a raw size of 2 mod 3, such as an ML-DSA-65 key, that keeps the lead byte
-// the encoding needs, which MatterQB64's one rule for every code would drop.
+// MatterQB64Sized encodes raw under code where the code is a whole number of
+// four-character groups, or its length past one matches the lead bytes the
+// raw size needs: the raw bytes are left-padded with zero bytes to a multiple
+// of three, and the code replaces as many leading characters of their base64
+// as its length past a multiple of four. For a four-character code and a raw
+// size of 2 mod 3, such as an ML-DSA-65 key, that keeps the lead byte the
+// encoding needs, which MatterQB64's one rule for every code would drop. A
+// code whose length does not fit the raw size is refused: replacing a data
+// character with a code character would change the value with no error.
 func MatterQB64Sized(code string, raw []byte) (string, error) {
 	if code == "" {
 		return "", fmt.Errorf("a CESR value must carry a code saying what it is")
 	}
 	lead := (3 - len(raw)%3) % 3
+	if d := len(code) % 4; d != 0 && d != lead {
+		return "", fmt.Errorf("a %d-character code cannot carry %d bytes: it would replace "+
+			"%d characters where the value has %d lead bytes", len(code), len(raw), d, lead)
+	}
 	padded := make([]byte, lead+len(raw))
 	copy(padded[lead:], raw)
 	full := base64.RawURLEncoding.EncodeToString(padded)
@@ -183,6 +190,9 @@ func MatterRawSized(code, qb64 string, rawLen int) ([]byte, error) {
 	}
 	lead := (3 - rawLen%3) % 3
 	drop := len(code) % 4
+	if drop != 0 && drop != lead {
+		return nil, fmt.Errorf("a %d-character code cannot carry %d bytes", len(code), rawLen)
+	}
 	if want := len(code) - drop + (lead+rawLen)/3*4; len(qb64) != want {
 		return nil, fmt.Errorf("%q value is %d characters, and %d bytes under it are %d",
 			code, len(qb64), rawLen, want)

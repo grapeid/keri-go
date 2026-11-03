@@ -81,6 +81,16 @@ func SelfTest() *SelfTestResult {
 		return out
 	}
 
+	// A build reading the provisional post-quantum codes is a test build,
+	// and fails here, so one that reaches anywhere real says so.
+	if PostQuantumTestCodes() {
+		out.Total++
+		out.Failed++
+		out.Cases = append(out.Cases, CaseResult{ID: "post-quantum-test-codes", Status: "fail",
+			Detail: "this build reads provisional post-quantum codes (the kerigo_pqtest tag); " +
+				"it is a test build, never a production one"})
+	}
+
 	cases := append([]Case(nil), vf.Cases...)
 	sort.Slice(cases, func(i, j int) bool { return cases[i].ID < cases[j].ID })
 

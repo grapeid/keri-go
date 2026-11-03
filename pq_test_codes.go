@@ -1,10 +1,10 @@
-//go:build pqtest
+//go:build kerigo_pqtest
 
 package keri
 
 import "github.com/cloudflare/circl/sign/mldsa/mldsa65"
 
-// Provisional post-quantum codes, read only by a build with the "pqtest" tag,
+// Provisional post-quantum codes, read only by a build with the "kerigo_pqtest" tag,
 // so stage two of a hybrid identity (ADR-061 section 6) can be built and
 // tested before CESR assigns codes. A production build reads none of them.
 //
@@ -14,16 +14,18 @@ import "github.com/cloudflare/circl/sign/mldsa/mldsa65"
 // signature code exists (CESR issue #171). It is a two-character code, three
 // characters of index and three of prior-next place, so the 3309-byte
 // signature, a multiple of three, fills whole quadruples with no lead byte.
+// CodeMLDSA65CurrentOnlySig is its current-only form, as 2B is 2A's: its
+// prior-next characters are zero and it opens no commitment.
 const (
-	CodeMLDSA65Key        = "2AAE"
-	CodeMLDSA65IndexedSig = "3Z"
+	CodeMLDSA65Key            = "2AAE"
+	CodeMLDSA65IndexedSig     = "3Z"
+	CodeMLDSA65CurrentOnlySig = "3Y"
 )
 
 func init() {
 	extraKeyCodes[CodeMLDSA65Key] = keyAlgorithm{
-		RawLen:  mldsa65.PublicKeySize,
-		SigCode: CodeMLDSA65IndexedSig,
-		SigLen:  mldsa65.SignatureSize,
+		RawLen:   mldsa65.PublicKeySize,
+		SigCodes: []string{CodeMLDSA65IndexedSig, CodeMLDSA65CurrentOnlySig},
 		Verify: func(pub, msg, sig []byte) bool {
 			var pk mldsa65.PublicKey
 			if pk.UnmarshalBinary(pub) != nil {
@@ -35,6 +37,9 @@ func init() {
 	extraIndexedSigCodes[CodeMLDSA65IndexedSig] = indexedSigCode{
 		IndexChars: 3, OndexChars: 3, RawLen: mldsa65.SignatureSize,
 	}
+	extraIndexedSigCodes[CodeMLDSA65CurrentOnlySig] = indexedSigCode{
+		IndexChars: 3, OndexChars: 3, RawLen: mldsa65.SignatureSize, CurrentOnly: true,
+	}
 }
 
 // EncodeMLDSA65IndexedSignature writes an ML-DSA-65 signature at the places it
@@ -43,9 +48,8 @@ func EncodeMLDSA65IndexedSignature(sig []byte, at SignaturePlace) (string, error
 	three := func(n int) string {
 		return string([]byte{b64Alphabet[n/4096%64], b64Alphabet[n/64%64], b64Alphabet[n%64]})
 	}
-	ondex := at.Ondex
 	if at.CurrentOnly {
-		ondex = at.Index
+		return MatterQB64Sized(CodeMLDSA65CurrentOnlySig+three(at.Index)+"AAA", sig)
 	}
-	return MatterQB64Sized(CodeMLDSA65IndexedSig+three(at.Index)+three(ondex), sig)
+	return MatterQB64Sized(CodeMLDSA65IndexedSig+three(at.Index)+three(at.Ondex), sig)
 }
