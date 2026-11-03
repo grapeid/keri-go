@@ -183,16 +183,13 @@ func verifyControllerSignatures(fs *faults, ev *Event, groups []attachment,
 					"list holds %d keys", sig.Index, len(keys))
 				continue
 			}
-			pub, err := MatterRaw(CodeEd25519, keys[sig.Index], ed25519.PublicKeySize)
+			ok, err := verifyIndexedSig(keys[sig.Index], ev.Raw, sig)
 			if err != nil {
-				pub, err = MatterRaw(CodeEd25519N, keys[sig.Index], ed25519.PublicKeySize)
-			}
-			if err != nil {
-				fs.add(FaultSignatureInvalid, "key %d (%s) is not a readable Ed25519 "+
-					"public key: %v", sig.Index, keys[sig.Index], err)
+				fs.add(FaultSignatureInvalid, "key %d (%.12s…) is not a public key this "+
+					"build reads: %v", sig.Index, keys[sig.Index], err)
 				continue
 			}
-			if !ed25519.Verify(pub, ev.Raw, sig.Raw) {
+			if !ok {
 				dropped++
 				continue
 			}

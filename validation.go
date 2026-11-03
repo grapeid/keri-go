@@ -646,6 +646,7 @@ func validateEvent(fs *faults, raw []byte) *Event {
 	checkThresholds(fs, ev)
 	checkWitnessIdentifiers(fs, ev)
 	checkKeyLists(fs, ev)
+	checkKeyCodes(fs, ev)
 	return ev
 }
 
@@ -1178,6 +1179,9 @@ const (
 // refused, because guessing its width would read whatever follows from the
 // wrong offset.
 func indexedSigWidth(s string) (int, error) {
+	if _, width := extraIndexedSigWidth(s); width > 0 {
+		return width, nil
+	}
 	switch {
 	case strings.HasPrefix(s, codeIdxBigSig), strings.HasPrefix(s, codeIdxBigCrtSig):
 		return sizeIndexedBigSig, nil
@@ -1240,6 +1244,9 @@ func transReceiptQuadruplesWidth(code, s string, count int) (int, error) {
 }
 
 func readIndexedSig(qb64 string) (indexedSig, error) {
+	if code, width := extraIndexedSigWidth(qb64); width > 0 {
+		return readExtraIndexedSig(code, qb64)
+	}
 	width, err := indexedSigWidth(qb64)
 	if err != nil {
 		return indexedSig{}, err
