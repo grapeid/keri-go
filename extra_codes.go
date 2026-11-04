@@ -201,15 +201,17 @@ func VerifyUnderKey(key string, msg []byte, sigCode string, sig []byte) error {
 		return fmt.Errorf("this package verifies no signature under the ECDSA key %.12s…", key)
 	}
 	if alg.Verify == nil {
-		if _, extra := extraIndexedSigCodes[sigCode]; extra {
+		switch sigCode {
+		case "", "A", "B", "2A", "2B":
+		default:
 			return fmt.Errorf("a signature under code %q does not fit the Ed25519 key %.12s…", sigCode, key)
 		}
 		pub, err := MatterRaw(code, key, ed25519.PublicKeySize)
 		if err != nil {
-			return fmt.Errorf("%q is not a readable Ed25519 public key: %w", key, err)
+			return fmt.Errorf("%.12s… is not a readable Ed25519 public key: %w", key, err)
 		}
 		if len(sig) != ed25519.SignatureSize || !ed25519.Verify(pub, msg, sig) {
-			return fmt.Errorf("the signature does not verify under %s, so whoever produced "+
+			return fmt.Errorf("the signature does not verify under %.12s…, so whoever produced "+
 				"it did not hold that key", key)
 		}
 		return nil
@@ -225,10 +227,10 @@ func VerifyUnderKey(key string, msg []byte, sigCode string, sig []byte) error {
 	}
 	pub, err := MatterRawSized(code, key, alg.RawLen)
 	if err != nil {
-		return fmt.Errorf("%q is not a readable public key: %w", key, err)
+		return fmt.Errorf("%.12s… is not a readable public key: %w", key, err)
 	}
 	if !alg.Verify(pub, msg, sig) {
-		return fmt.Errorf("the signature does not verify under %s, so whoever produced "+
+		return fmt.Errorf("the signature does not verify under %.12s…, so whoever produced "+
 			"it did not hold that key", key)
 	}
 	return nil

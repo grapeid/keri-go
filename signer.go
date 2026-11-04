@@ -143,11 +143,13 @@ func NextDigest(publicKeyQB64 string) (string, error) {
 	return Blake3SAID([]byte(publicKeyQB64))
 }
 
-// VerifySignature checks a raw signature against a qb64 public key.
+// VerifySignature checks a raw signature against a qb64 public key, through
+// VerifyUnderKey.
 //
-// Accepts either key code: a transferable controller key or a non-transferable
-// witness key both verify the same way, and refusing one of them here would
-// make witness receipts uncheckable.
+// Accepts either Ed25519 key code: a transferable controller key or a
+// non-transferable witness key both verify the same way, and refusing one of
+// them here would make witness receipts uncheckable. In a build with the
+// kerigo_pqtest tag an ML-DSA-65 key verifies too; an ECDSA key never does.
 func VerifySignature(publicKeyQB64 string, data, signature []byte) error {
 	return VerifyUnderKey(publicKeyQB64, data, "", signature)
 }
