@@ -180,38 +180,66 @@ func readExtraIndexedSig(code, qb64 string) (indexedSig, error) {
 	return sig, nil
 }
 
-// verifyIndexedSig checks sig over msg under key, by the key's code: an
-// Ed25519 key takes an Ed25519 indexed signature, a registered key the
-// signature code it was registered with. A signature under another key's code
-// does not verify.
-func verifyIndexedSig(key string, msg []byte, sig indexedSig) (bool, error) {
+// VerifyUnderKey checks one signature over msg under key, by the key's code:
+// an Ed25519 key ("D" or "B") takes an Ed25519 signature, and a registered
+// key (ML-DSA-65, in a build with the "kerigo_pqtest" tag only) the signature
+// it was registered with. A build without the tag refuses a post-quantum key
+// outright, as it refuses to read one.
+//
+// sigCode is the signature's indexed code ("A", "B", "2A", "2B", or a
+// registered one), or "" for a raw signature that carries none. A signature
+// whose code does not fit the key's, such as an Ed25519 one offered for an
+// ML-DSA-65 key, is refused, and so is a raw signature of the wrong size for
+// the key. A nil error means the signature verifies; every other outcome is
+// an error saying why.
+func VerifyUnderKey(key string, msg []byte, sigCode string, sig []byte) error {
 	code, alg, ok := keyCodeOf(key)
 	if !ok {
-		return false, fmt.Errorf("the key is under no code this build reads")
+		return fmt.Errorf("%.12s… is under no code this build reads, or is the wrong length for its code", key)
 	}
 	if alg.Unverified {
-		return false, nil
+		return fmt.Errorf("this package verifies no signature under the ECDSA key %.12s…", key)
 	}
 	if alg.Verify == nil {
-		if _, extra := extraIndexedSigCodes[sig.Code]; extra {
-			return false, nil
+		if _, extra := extraIndexedSigCodes[sigCode]; extra {
+			return fmt.Errorf("a signature under code %q does not fit the Ed25519 key %.12s…", sigCode, key)
 		}
 		pub, err := MatterRaw(code, key, ed25519.PublicKeySize)
 		if err != nil {
-			return false, err
+			return fmt.Errorf("%q is not a readable Ed25519 public key: %w", key, err)
 		}
-		return ed25519.Verify(pub, msg, sig.Raw), nil
+		if len(sig) != ed25519.SignatureSize || !ed25519.Verify(pub, msg, sig) {
+			return fmt.Errorf("the signature does not verify under %s, so whoever produced "+
+				"it did not hold that key", key)
+		}
+		return nil
 	}
-	carried := false
-	for _, c := range alg.SigCodes {
-		carried = carried || sig.Code == c
-	}
-	if !carried {
-		return false, nil
+	if sigCode != "" {
+		carried := false
+		for _, c := range alg.SigCodes {
+			carried = carried || sigCode == c
+		}
+		if !carried {
+			return fmt.Errorf("a signature under code %q does not fit the key %.12s…", sigCode, key)
+		}
 	}
 	pub, err := MatterRawSized(code, key, alg.RawLen)
 	if err != nil {
-		return false, err
+		return fmt.Errorf("%q is not a readable public key: %w", key, err)
 	}
-	return alg.Verify(pub, msg, sig.Raw), nil
+	if !alg.Verify(pub, msg, sig) {
+		return fmt.Errorf("the signature does not verify under %s, so whoever produced "+
+			"it did not hold that key", key)
+	}
+	return nil
+}
+
+// verifyIndexedSig checks sig over msg under key with VerifyUnderKey. A
+// signature that does not verify is (false, nil), as before; a key this build
+// cannot read is an error.
+func verifyIndexedSig(key string, msg []byte, sig indexedSig) (bool, error) {
+	if _, _, ok := keyCodeOf(key); !ok {
+		return false, fmt.Errorf("the key is under no code this build reads")
+	}
+	return VerifyUnderKey(key, msg, sig.Code, sig.Raw) == nil, nil
 }
