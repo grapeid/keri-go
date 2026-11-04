@@ -3,6 +3,7 @@ package keri
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/zeebo/blake3"
 )
@@ -151,4 +152,65 @@ func padChars(n int) string {
 func Blake3SAID(data []byte) (string, error) {
 	sum := blake3.Sum256(data)
 	return MatterQB64(CodeBlake3_256, sum[:])
+}
+
+// MatterQB64Sized encodes raw under code where the code is a whole number of
+// four-character groups, or its length past one matches the lead bytes the
+// raw size needs: the raw bytes are left-padded with zero bytes to a multiple
+// of three, and the code replaces as many leading characters of their base64
+// as its length past a multiple of four. For a four-character code and a raw
+// size of 2 mod 3, such as an ML-DSA-65 key, that keeps the lead byte the
+// encoding needs, which MatterQB64's one rule for every code would drop. A
+// code whose length does not fit the raw size is refused: replacing a data
+// character with a code character would change the value with no error.
+func MatterQB64Sized(code string, raw []byte) (string, error) {
+	if code == "" {
+		return "", fmt.Errorf("a CESR value must carry a code saying what it is")
+	}
+	lead := (3 - len(raw)%3) % 3
+	if d := len(code) % 4; d != 0 && d != lead {
+		return "", fmt.Errorf("a %d-character code cannot carry %d bytes: it would replace "+
+			"%d characters where the value has %d lead bytes", len(code), len(raw), d, lead)
+	}
+	padded := make([]byte, lead+len(raw))
+	copy(padded[lead:], raw)
+	full := base64.RawURLEncoding.EncodeToString(padded)
+	drop := len(code) % 4
+	if drop > len(full) {
+		return "", fmt.Errorf("cannot encode %d bytes with the %q code", len(raw), code)
+	}
+	return code + full[drop:], nil
+}
+
+// MatterRawSized reads a value MatterQB64Sized wrote: exactly rawLen bytes
+// under code, its lead bytes zero, in its one canonical spelling.
+func MatterRawSized(code, qb64 string, rawLen int) ([]byte, error) {
+	if code == "" || len(qb64) < len(code) || qb64[:len(code)] != code {
+		return nil, fmt.Errorf("expected a %q value, got one starting %.4q", code, qb64)
+	}
+	lead := (3 - rawLen%3) % 3
+	drop := len(code) % 4
+	if drop != 0 && drop != lead {
+		return nil, fmt.Errorf("a %d-character code cannot carry %d bytes", len(code), rawLen)
+	}
+	if want := len(code) - drop + (lead+rawLen)/3*4; len(qb64) != want {
+		return nil, fmt.Errorf("%q value is %d characters, and %d bytes under it are %d",
+			code, len(qb64), rawLen, want)
+	}
+	body := qb64[len(code):]
+	if !isBase64URL(body) {
+		return nil, fmt.Errorf("%q value has a character outside base64url, so it is not qb64", code)
+	}
+	full := strings.Repeat("A", drop) + body
+	padded, err := base64.RawURLEncoding.Strict().DecodeString(full)
+	if err != nil {
+		return nil, fmt.Errorf("%q value is not base64url: %w", code, err)
+	}
+	for _, b := range padded[:lead] {
+		if b != 0 {
+			return nil, fmt.Errorf("%q value's lead bytes are not zero, so it is not "+
+				"the canonical spelling of its value", code)
+		}
+	}
+	return padded[lead:], nil
 }
