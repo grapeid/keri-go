@@ -28,7 +28,7 @@ func respell(t *testing.T, qb64 string, codeLen, k int) string {
 
 func TestAKeyHasOneSpelling(t *testing.T) {
 	for _, code := range []string{CodeEd25519, CodeEd25519N} {
-		pub := bytes.Repeat([]byte{0x5a}, ed25519.PublicKeySize)
+		pub := []byte(ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x5a}, 32)).Public().(ed25519.PublicKey))
 		q, err := MatterQB64(code, pub)
 		if err != nil {
 			t.Fatal(err)

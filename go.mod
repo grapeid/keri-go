@@ -3,6 +3,7 @@ module github.com/grapeid/keri-go
 go 1.24.0
 
 require (
+	filippo.io/edwards25519 v1.2.0
 	github.com/cloudflare/circl v1.6.3
 	github.com/zeebo/blake3 v0.2.4
 )

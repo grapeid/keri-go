@@ -85,6 +85,10 @@ func MatterQB64(code string, raw []byte) (string, error) {
 //     so a value with one inserted read as the same bytes;
 //   - the length. A qb64 value is always a whole number of four-character
 //     groups, and exactly as long as its code and size make it.
+//
+// An Ed25519 key ("D" or "B") must also be a key: a point on the curve, in its
+// canonical encoding, of large order (CheckEd25519PublicKey). Every key read
+// from a log, an event or a receipt comes through here, so none escapes it.
 func MatterRaw(code, qb64 string, expectLen int) ([]byte, error) {
 	if code == "" || len(qb64) < len(code) || qb64[:len(code)] != code {
 		return nil, fmt.Errorf("expected a %q value, got one starting %.4q", code, qb64)
@@ -119,6 +123,11 @@ func MatterRaw(code, qb64 string, expectLen int) ([]byte, error) {
 	raw := decoded[pad:]
 	if expectLen > 0 && len(raw) != expectLen {
 		return nil, fmt.Errorf("expected %d bytes for a %q value, got %d", expectLen, code, len(raw))
+	}
+	if code == CodeEd25519 || code == CodeEd25519N {
+		if err := CheckEd25519PublicKey(raw); err != nil {
+			return nil, fmt.Errorf("%q value: %w", code, err)
+		}
 	}
 	return raw, nil
 }
