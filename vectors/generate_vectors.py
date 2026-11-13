@@ -32,6 +32,11 @@ from keri.core.coring import CtrDex, MtrDex
 from keri.vc import proving
 from keri.vdr import eventing as vdr_eventing
 
+try:  # where keripy keeps the configuration traits has moved between releases
+    from keri.kering import TraitDex
+except ImportError:
+    from keri.core.eventing import TraitDex
+
 VECTOR_VERSION = 1
 
 # Fixed wall-clock values so credential and TEL vectors regenerate identically.
@@ -928,6 +933,27 @@ def credential_cases():
          "nonce": FIXED_REGISTRY_NONCE,
          "issuer_inception_raw_b64": base64.b64encode(issuer_icp.raw).decode()},
         reg,
+    ))
+
+    # Registry founded with the no-backers configuration trait. Same issuer and
+    # nonce as above, so the trait alone is what changes the bytes and the
+    # registry identifier.
+    reg_nb = vdr_eventing.incept(
+        pre=issuer_icp.pre, toad=0, baks=[], nonce=FIXED_REGISTRY_NONCE,
+        cnfg=[TraitDex.NoBackers],
+    )
+    out.append(case(
+        "acdc/registry/vcp-no-backers-trait",
+        "credential",
+        "A registry founded with the NB trait can never take backers, so its events "
+        "are witnessed only through the issuer's own key log. The trait is part of "
+        "the inception's bytes: an implementation that drops it, or writes it "
+        "differently, names a different registry, and a verifier cannot tell that "
+        "the registry will never add backers.",
+        {"issuer": issuer_icp.pre, "toad": 0, "backers": [],
+         "nonce": FIXED_REGISTRY_NONCE, "no_backers": True,
+         "issuer_inception_raw_b64": base64.b64encode(issuer_icp.raw).decode()},
+        reg_nb,
     ))
 
     claims = {"name": "Alice", "dt": FIXED_DT_ISSUE, "score": 42}

@@ -170,3 +170,15 @@ func groupBodyWidth(code string, count int, body string) (int, error) {
 			"so where the next message begins is unknown", code)
 	}
 }
+
+// EventOfMessage returns the event at the front of a message, without its
+// attachments. The message is what ParseKELStream returns and what
+// ValidateSignedKEL takes; a reader that needs the event's own fields (its
+// anchors, say) reads them from these bytes, which the signatures cover.
+func EventOfMessage(message []byte) ([]byte, error) {
+	event, _, err := splitStream(message)
+	if err != nil {
+		return nil, err
+	}
+	return event, nil
+}

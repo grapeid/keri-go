@@ -358,7 +358,15 @@ type RegistryInput struct {
 	// identities. Supplied by the caller rather than generated here, so that
 	// founding a registry is reproducible and can be held to a fixed answer.
 	Nonce string `json:"nonce"`
+	// NoBackers founds the registry with the configuration trait "NB": it will
+	// never have backers, so its events are witnessed only through its issuer's
+	// own key log (keripy: incept(..., noBackers=True)). It cannot be combined
+	// with a backer list.
+	NoBackers bool `json:"no_backers"`
 }
+
+// registryTraitNoBackers is the registry configuration trait "no backers".
+const registryTraitNoBackers = "NB"
 
 // vcpWire is a registry inception in the order KERI serialises it.
 type vcpWire struct {
@@ -399,6 +407,9 @@ func BuildRegistryInception(in RegistryInput) ([]byte, error) {
 	if err := noDuplicateWitnesses(backers, "backer"); err != nil {
 		return nil, err
 	}
+	if in.NoBackers && len(backers) > 0 {
+		return nil, fmt.Errorf("a registry that has no backers cannot be given %d of them", len(backers))
+	}
 	if len(backers) == 0 && in.Toad != 0 {
 		return nil, fmt.Errorf("a registry with no backers cannot require %d of them", in.Toad)
 	}
@@ -406,6 +417,10 @@ func BuildRegistryInception(in RegistryInput) ([]byte, error) {
 		return nil, fmt.Errorf("a threshold of %d cannot be met by %d backers", in.Toad, len(backers))
 	}
 
+	traits := []string{}
+	if in.NoBackers {
+		traits = []string{registryTraitNoBackers}
+	}
 	w := vcpWire{
 		V:  placeholderVersionString(ProtocolKERI, V1),
 		T:  ilkRegistryInception,
@@ -413,7 +428,7 @@ func BuildRegistryInception(in RegistryInput) ([]byte, error) {
 		I:  saidDummy(),
 		II: in.Issuer,
 		S:  sequenceNumber(0),
-		C:  []string{},
+		C:  traits,
 		BT: sequenceNumber(in.Toad),
 		B:  backers,
 		N:  in.Nonce,
@@ -887,6 +902,14 @@ type TELEvent struct {
 	Prior    string
 	DateTime string
 	Raw      []byte
+
+	// What a registry inception says of itself (empty for the other events):
+	// the identity that governs it (`ii`), its configuration traits (`c`), its
+	// backers (`b`) and their threshold (`bt`, as written).
+	Issuer          string
+	Traits          []string
+	Backers         []string
+	BackerThreshold string
 }
 
 // VerifyTELEvent checks a registry, issuance or revocation event against itself.
@@ -939,6 +962,17 @@ func VerifyTELEvent(raw []byte) (*TELEvent, error) {
 	}
 	if ilk == ilkRegistryInception && out.Subject != said {
 		return nil, fmt.Errorf("a registry's prefix must be its own identifier, but this one is %q", out.Subject)
+	}
+	if ilk == ilkRegistryInception {
+		out.Issuer, _ = sad.getString("ii")
+		out.BackerThreshold, _ = sad.getString("bt")
+		var err error
+		if out.Traits, err = stringListOf(sad, "c"); err != nil {
+			return nil, err
+		}
+		if out.Backers, err = stringListOf(sad, "b"); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
@@ -1198,4 +1232,17 @@ func AnswerCredential(c Case) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("this credential case names nothing this knows how to build")
 	}
+}
+
+// stringListOf reads a field that must be a list of strings.
+func stringListOf(o jsonObject, key string) ([]string, error) {
+	raw, ok := o.get(key)
+	if !ok {
+		return nil, fmt.Errorf("the event carries no %q", key)
+	}
+	var out []string
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, fmt.Errorf("%q is not a list of strings: %w", key, err)
+	}
+	return out, nil
 }
