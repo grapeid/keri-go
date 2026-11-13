@@ -1761,6 +1761,38 @@
       }
     },
     {
+      "id": "acdc/registry/vcp-no-backers-trait",
+      "kind": "credential",
+      "why": "A registry founded with the NB trait can never take backers, so its events are witnessed only through the issuer's own key log. The trait is part of the inception's bytes: an implementation that drops it, or writes it differently, names a different registry, and a verifier cannot tell that the registry will never add backers.",
+      "input": {
+        "issuer": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+        "toad": 0,
+        "backers": [],
+        "nonce": "0AB2dnZ2dnZ2dnZ2dnZ2dnZ2",
+        "no_backers": true,
+        "issuer_inception_raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDEyYl8iLCJ0IjoiaWNwIiwiZCI6IkVIUGhhTkJYY1NFV2dSdUQ2X2VLVWpUekRSSkFsb1RzZHNsRnhMVm1iOVUwIiwiaSI6IkRHTER6aGc3Vk8xVUVGT3M0QXYtZ1VVN2hjUmJkdnlPXzVudzdJYktCclF0IiwicyI6IjAiLCJrdCI6IjEiLCJrIjpbIkRHTER6aGc3Vk8xVUVGT3M0QXYtZ1VVN2hjUmJkdnlPXzVudzdJYktCclF0Il0sIm50IjoiMSIsIm4iOlsiRVBhRlBXV0VBQlYyQW5aZU0xUXF6UTd6Sld4MGF6RTloMktjVUI5ZE0zc0IiXSwiYnQiOiIwIiwiYiI6W10sImMiOltdLCJhIjpbXX0="
+      },
+      "expect": {
+        "raw_b64": "eyJ2IjoiS0VSSTEwSlNPTjAwMDBmZl8iLCJ0IjoidmNwIiwiZCI6IkVEdVk0Z2VqemppQWJkMlUyUzdmcU5kLUxOTHVHb29xdnh0eENWcjJLNTh4IiwiaSI6IkVEdVk0Z2VqemppQWJkMlUyUzdmcU5kLUxOTHVHb29xdnh0eENWcjJLNTh4IiwiaWkiOiJER0xEemhnN1ZPMVVFRk9zNEF2LWdVVTdoY1JiZHZ5T181bnc3SWJLQnJRdCIsInMiOiIwIiwiYyI6WyJOQiJdLCJidCI6IjAiLCJiIjpbXSwibiI6IjBBQjJkbloyZG5aMmRuWjJkbloyZG5aMiJ9",
+        "said": "EDuY4gejzjiAbd2U2S7fqNd-LNLuGooqvxtxCVr2K58x",
+        "aid": "EDuY4gejzjiAbd2U2S7fqNd-LNLuGooqvxtxCVr2K58x",
+        "event_readable": {
+          "v": "KERI10JSON0000ff_",
+          "t": "vcp",
+          "d": "EDuY4gejzjiAbd2U2S7fqNd-LNLuGooqvxtxCVr2K58x",
+          "i": "EDuY4gejzjiAbd2U2S7fqNd-LNLuGooqvxtxCVr2K58x",
+          "ii": "DGLDzhg7VO1UEFOs4Av-gUU7hcRbdvyO_5nw7IbKBrQt",
+          "s": "0",
+          "c": [
+            "NB"
+          ],
+          "bt": "0",
+          "b": [],
+          "n": "0AB2dnZ2dnZ2dnZ2dnZ2dnZ2"
+        }
+      }
+    },
+    {
       "id": "acdc/issued-into-registry",
       "kind": "credential",
       "why": "A registry-backed credential names its registry in ri, and its own SAID is a digest of its canonical bytes. A verifier offline must recompute that SAID exactly; any other serialisation means the credential cannot be checked.",
