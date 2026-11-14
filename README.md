@@ -76,6 +76,7 @@ that gap.
 | Credentials | ACDC credentials, registries, issuance, revocation, **edge-chain verification** |
 | Keys | generation, pre-rotation custody, encrypted-at-rest storage, an interface a hardware signer can satisfy |
 | Streams | CESR attachments, and publishing or reading a whole key log |
+| Exchange messages | `exn`, built in keripy's exact form, read only in that form, and signed by a non-transferable sender as the couple a keripy `Exchanger` takes (`BuildExchange`, `VerifyExchange`, `SignExchange`, `VerifyExchangeSigned`); vectors built and taken by keripy 1.3.6 in `vectors/keri_exchange_vectors_keripy-1.3.6.json` |
 | Signatures | indexed Ed25519 in all four forms keripy defines: `A` and `2A` (a place in the key list and a place in the prior next-key commitments, the same or apart), `B` and `2B` (the key list only) |
 
 Both CESR 1.0 and 2.0 can be read and built. **1.0 is the default**, because 2.0
@@ -86,6 +87,7 @@ the other. See `version.go`.
 ## What is not implemented
 
 - **Post-quantum signatures.** Ed25519 only.
+- **Exchange messages from a transferable sender**, with embedded events (`e`) or a prior message (`p`) chain. Only the form above is built and read.
 - **Transaction receipt quadruples** (the `-D` attachment group).
 - **OOBI records**, mailboxes, and witness network transport — this is the event
   layer, not an agent.
