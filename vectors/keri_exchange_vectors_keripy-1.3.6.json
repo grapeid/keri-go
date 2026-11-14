@@ -1,0 +1,97 @@
+{
+ "version": 1,
+ "keripy": "1.3.6",
+ "cases": [
+  {
+   "name": "a message with a recipient and content",
+   "input": {
+    "sender_seed_tag": "a",
+    "recipient": "EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB",
+    "prior": "",
+    "dt": "2026-11-14T12:00:00.000000+00:00",
+    "route": "/test/route",
+    "data": "{\"kind\":\"ask\",\"n\":1}"
+   },
+   "sender": "BK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd",
+   "said": "EPvuDF97j0oh8YszcL6Nmkfm3Z1lbqXKOrZ_D5uzKhKa",
+   "raw": "{\"v\":\"KERI10JSON000158_\",\"t\":\"exn\",\"d\":\"EPvuDF97j0oh8YszcL6Nmkfm3Z1lbqXKOrZ_D5uzKhKa\",\"i\":\"BK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:00.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"ask\",\"n\":1},\"e\":{}}",
+   "stream": "{\"v\":\"KERI10JSON000158_\",\"t\":\"exn\",\"d\":\"EPvuDF97j0oh8YszcL6Nmkfm3Z1lbqXKOrZ_D5uzKhKa\",\"i\":\"BK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:00.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"ask\",\"n\":1},\"e\":{}}-CABBK8Go-MpFxTk81bBnJsVzRlR7G5mYqp3vgdUfyiTgzQd0BDqDWPxDxsK1RDf3TiJyGC8xNsPUkrfdzxPLaG4WR68Go-aevJ92lMrznSk-dkivE6EJzuRvd3EIUr_H384jmoJ",
+   "keripy_takes": true
+  },
+  {
+   "name": "a message to nobody in particular",
+   "input": {
+    "sender_seed_tag": "b",
+    "recipient": "",
+    "prior": "",
+    "dt": "2026-11-14T12:00:01.000000+00:00",
+    "route": "/test/route",
+    "data": "{\"kind\":\"note\"}"
+   },
+   "sender": "BC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m",
+   "said": "ED7Z-wUIUMrvoUR7Rz3Tf_QrI-hMwO1lUrC9ueYOqI7j",
+   "raw": "{\"v\":\"KERI10JSON0000f4_\",\"t\":\"exn\",\"d\":\"ED7Z-wUIUMrvoUR7Rz3Tf_QrI-hMwO1lUrC9ueYOqI7j\",\"i\":\"BC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m\",\"rp\":\"\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:01.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"kind\":\"note\"},\"e\":{}}",
+   "stream": "{\"v\":\"KERI10JSON0000f4_\",\"t\":\"exn\",\"d\":\"ED7Z-wUIUMrvoUR7Rz3Tf_QrI-hMwO1lUrC9ueYOqI7j\",\"i\":\"BC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m\",\"rp\":\"\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:01.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"kind\":\"note\"},\"e\":{}}-CABBC3wQSXwAVr7R86FOu-HcglP-UmMFMsbnhKXPCkn2g-m0BAL97RnJXPKvud6zKVuoEOmZfCLG1bh8OUlCd9oDzR0O7OIaXY2oDNaAYcRBQGw9PGJ-_dE5CXl0r2nj4LrvDwF",
+   "keripy_takes": true
+  },
+  {
+   "name": "a message that follows another",
+   "input": {
+    "sender_seed_tag": "c",
+    "recipient": "EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB",
+    "prior": "EKkPEUZ6Ihm-JvBBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0",
+    "dt": "2026-11-14T12:00:02.000000+00:00",
+    "route": "/test/route",
+    "data": "{\"kind\":\"reply\",\"words\":\"a < b & c > d\"}"
+   },
+   "sender": "BKf236-POLibqM5km1lPkeTQH9xX-clJPfQ7XlCpmHNn",
+   "said": "EFFcAic5rqngbR2i66kkdr4vU4_siGQPN53lv1HMMTb-",
+   "raw": "{\"v\":\"KERI10JSON000198_\",\"t\":\"exn\",\"d\":\"EFFcAic5rqngbR2i66kkdr4vU4_siGQPN53lv1HMMTb-\",\"i\":\"BKf236-POLibqM5km1lPkeTQH9xX-clJPfQ7XlCpmHNn\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"EKkPEUZ6Ihm-JvBBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0\",\"dt\":\"2026-11-14T12:00:02.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"reply\",\"words\":\"a < b & c > d\"},\"e\":{}}",
+   "stream": "{\"v\":\"KERI10JSON000198_\",\"t\":\"exn\",\"d\":\"EFFcAic5rqngbR2i66kkdr4vU4_siGQPN53lv1HMMTb-\",\"i\":\"BKf236-POLibqM5km1lPkeTQH9xX-clJPfQ7XlCpmHNn\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"EKkPEUZ6Ihm-JvBBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0\",\"dt\":\"2026-11-14T12:00:02.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"reply\",\"words\":\"a < b & c > d\"},\"e\":{}}-CABBKf236-POLibqM5km1lPkeTQH9xX-clJPfQ7XlCpmHNn0BC4wpW3q9u8gMCn8vvT48YTUY6jOaUsioxv7Wskl5RB1cjrLBsVChzclsGtqYJbX_7V-XPwoMIqsQ5At46HaxAF",
+   "keripy_takes": true
+  },
+  {
+   "name": "a message with no content",
+   "input": {
+    "sender_seed_tag": "d",
+    "recipient": "EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB",
+    "prior": "",
+    "dt": "2026-11-14T12:00:03.000000+00:00",
+    "route": "/test/route",
+    "data": "{}"
+   },
+   "sender": "BCvCgAszFuAJIJ_9dX2rGczwroS8eukGVOHoFxLScPZT",
+   "said": "EMfpW5RggtAmxpVRbNqjKwsuujerdutou2QSQTJDlXDh",
+   "raw": "{\"v\":\"KERI10JSON000145_\",\"t\":\"exn\",\"d\":\"EMfpW5RggtAmxpVRbNqjKwsuujerdutou2QSQTJDlXDh\",\"i\":\"BCvCgAszFuAJIJ_9dX2rGczwroS8eukGVOHoFxLScPZT\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:03.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\"},\"e\":{}}",
+   "stream": "{\"v\":\"KERI10JSON000145_\",\"t\":\"exn\",\"d\":\"EMfpW5RggtAmxpVRbNqjKwsuujerdutou2QSQTJDlXDh\",\"i\":\"BCvCgAszFuAJIJ_9dX2rGczwroS8eukGVOHoFxLScPZT\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:03.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\"},\"e\":{}}-CABBCvCgAszFuAJIJ_9dX2rGczwroS8eukGVOHoFxLScPZT0BBC-cOu0rwvTqNZ8Dl-PYTOoApJtWJuN8gboIupR-8srAI_OmhUImSBf-UlNZuDvsJcOlj6wkSvV-LUmo98bX4H",
+   "keripy_takes": true
+  }
+ ],
+ "refusals": [
+  {
+   "name": "one character of the signature changed",
+   "stream": "{\"v\":\"KERI10JSON000152_\",\"t\":\"exn\",\"d\":\"EBFVfg6RmdpDQuR4LNzUkhdCO6MCp9wa6T3fvNh5linW\",\"i\":\"BNYvAWoe_R5P33k-tCzYRHHhup8M8E0Sh7XMcfYWKHy4\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:00.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"ask\"},\"e\":{}}-CABBNYvAWoe_R5P33k-tCzYRHHhup8M8E0Sh7XMcfYWKHy40BAt99GAVtA9Nu181W7DhqGtkhePPFfX7Kgcfj25NPWPhIYB-HJOLVLQ5wtHgxiYhCZHIXcaVdYtCzVtr7LgGkYD",
+   "keripy_takes": false
+  },
+  {
+   "name": "signed by a key that is not the sender's",
+   "stream": "{\"v\":\"KERI10JSON000152_\",\"t\":\"exn\",\"d\":\"EBFVfg6RmdpDQuR4LNzUkhdCO6MCp9wa6T3fvNh5linW\",\"i\":\"BNYvAWoe_R5P33k-tCzYRHHhup8M8E0Sh7XMcfYWKHy4\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:00.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"ask\"},\"e\":{}}-CABBNYvAWoe_R5P33k-tCzYRHHhup8M8E0Sh7XMcfYWKHy40BC_qZJsorICGb9pPAzutrW2z2s_xQuDtRiGo7jhqiWoRQvuJYvKiUDiuaEHGIGnRtOvCtt9j9K5RgZ-HV0hkp4C",
+   "keripy_takes": false
+  },
+  {
+   "name": "a couple naming another sender, correctly signed",
+   "stream": "{\"v\":\"KERI10JSON000152_\",\"t\":\"exn\",\"d\":\"EBFVfg6RmdpDQuR4LNzUkhdCO6MCp9wa6T3fvNh5linW\",\"i\":\"BNYvAWoe_R5P33k-tCzYRHHhup8M8E0Sh7XMcfYWKHy4\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:00.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"ask\"},\"e\":{}}-CABBDS02QQxVsttzwvrCilJt1WclA0ry22-jFOpswJ446dG0BC_qZJsorICGb9pPAzutrW2z2s_xQuDtRiGo7jhqiWoRQvuJYvKiUDiuaEHGIGnRtOvCtt9j9K5RgZ-HV0hkp4C",
+   "keripy_takes": false
+  },
+  {
+   "name": "a character of the content changed after signing",
+   "stream": "{\"v\":\"KERI10JSON000152_\",\"t\":\"exn\",\"d\":\"EBFVfg6RmdpDQuR4LNzUkhdCO6MCp9wa6T3fvNh5linW\",\"i\":\"BNYvAWoe_R5P33k-tCzYRHHhup8M8E0Sh7XMcfYWKHy4\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:00.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"asx\"},\"e\":{}}-CABBNYvAWoe_R5P33k-tCzYRHHhup8M8E0Sh7XMcfYWKHy40BAt99GAVtk9Nu181W7DhqGtkhePPFfX7Kgcfj25NPWPhIYB-HJOLVLQ5wtHgxiYhCZHIXcaVdYtCzVtr7LgGkYD",
+   "keripy_takes": false
+  },
+  {
+   "name": "no signature at all",
+   "stream": "{\"v\":\"KERI10JSON000152_\",\"t\":\"exn\",\"d\":\"EBFVfg6RmdpDQuR4LNzUkhdCO6MCp9wa6T3fvNh5linW\",\"i\":\"BNYvAWoe_R5P33k-tCzYRHHhup8M8E0Sh7XMcfYWKHy4\",\"rp\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"p\":\"\",\"dt\":\"2026-11-14T12:00:00.000000+00:00\",\"r\":\"/test/route\",\"q\":{},\"a\":{\"i\":\"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvB\",\"kind\":\"ask\"},\"e\":{}}",
+   "keripy_takes": false
+  }
+ ]
+}
