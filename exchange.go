@@ -20,8 +20,8 @@ import (
 // The bytes are keripy's `exchanging.exchange` byte for byte (the field order
 // v t d i rp p dt r q a e, no white space), and a keripy `Exchanger` accepts
 // the signed form this package makes. exchange_test.go holds both to that with
-// vectors keripy built, and interop/keripy_accepts_exchange.py asks keripy
-// itself.
+// vectors keripy built, and vectors/generate_exchange_vectors.py, which writes
+// them, has keripy itself take each signed message and refuse each altered one.
 //
 // WHO SIGNS. The signature that keripy accepts for a sender is one made by the
 // key of the identifier in `i`. For a sender that cannot sign with its

@@ -162,3 +162,89 @@ func TestAnExchangeMessageHoldingALineSeparatorIsRefused(t *testing.T) {
 		t.Error("read a message holding U+2028")
 	}
 }
+
+// reSAID writes w in its one form with an identifier computed for what it now
+// says, so a test can make a message whose only fault is the one it means.
+func reSAID(t *testing.T, w exnWire) []byte {
+	t.Helper()
+	w.D = saidDummy()
+	dummy, err := serializeVersioned(w, ProtocolKERI, V1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	said, err := saidOf(dummy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.D = said
+	raw, err := serializeVersioned(w, ProtocolKERI, V1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+// A message whose content names a recipient other than its own is refused even
+// when its identifier is computed for what it says.
+func TestAnExchangeMessageWhoseContentNamesAnotherRecipientIsRefused(t *testing.T) {
+	raw, _ := buildSample(t)
+	var w exnWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := VerifyExchange(reSAID(t, w)); err != nil {
+		t.Fatalf("the unchanged message was refused, so this test proves nothing: %v", err)
+	}
+	w.A = json.RawMessage(`{"i":"EBHuxd-8Q6mUp5q7sGdnKq3m-hz5G0rkPEUZ6Ihm-JvC","a":1}`)
+	if _, err := VerifyExchange(reSAID(t, w)); err == nil {
+		t.Fatal("a message for one recipient whose content names another was read")
+	}
+}
+
+// A signed message carries exactly one attachment, the sender's couple: a
+// second group, or anything after it, is refused, not read in part.
+func TestASignedExchangeMessageCarriesOneAttachmentOnly(t *testing.T) {
+	raw, key := buildSample(t)
+	stream, err := SignExchange(raw, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := VerifyExchangeSigned(stream); err != nil {
+		t.Fatalf("the signed message was refused: %v", err)
+	}
+	att := stream[len(raw):]
+	for name, bad := range map[string][]byte{
+		"a second attachment group":  append(append([]byte(nil), stream...), att...),
+		"bytes after the attachment": append(append([]byte(nil), stream...), 'x'),
+		"no attachment":              raw,
+	} {
+		if _, err := VerifyExchangeSigned(bad); err == nil {
+			t.Errorf("%s was taken", name)
+		}
+	}
+}
+
+// A sender that is a transferable identifier is not checked by its own key, so
+// a message from one is refused even when a couple naming it is attached.
+func TestAnExchangeMessageFromATransferableSenderIsRefused(t *testing.T) {
+	raw, key := buildSample(t)
+	var w exnWire
+	if err := json.Unmarshal(raw, &w); err != nil {
+		t.Fatal(err)
+	}
+	pub := key.Public().(ed25519.PublicKey)
+	trans, err := MatterQB64(CodeEd25519, pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.I = trans
+	moved := reSAID(t, w)
+	cigar, _ := MatterQB64(CodeEd25519Sig, ed25519.Sign(key, moved))
+	att, err := AttachReceiptCouples([]ReceiptCouple{{Witness: trans, CigarQB64: cigar}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := VerifyExchangeSigned(append(moved, att...)); err == nil {
+		t.Fatal("a message from a transferable sender was taken")
+	}
+}
